@@ -9,15 +9,8 @@ from django.core.files.storage import FileSystemStorage
 from datetime import date
 import os
 import exifread
-import os
-import cv2
-from ultralytics import YOLO
-import matplotlib.pyplot as plt
-import numpy as np
 import base64
 import io
-from django.core.mail import send_mail
-from django.conf import settings
 import json
 from dotenv import load_dotenv
 
@@ -46,6 +39,7 @@ def get_yolo_model():
     global _yolo8_model
     if _yolo8_model is None:
         try:
+            from ultralytics import YOLO  # Lazy import
             _yolo8_model = YOLO("model/yolo8_best.pt")
         except Exception as e:
             print(f"Error loading YOLO model: {e}")
@@ -74,6 +68,10 @@ def _send_complaint_update_email(complaint_id, subject, event_description):
 
 # function to read test image and then detect & predict road damage type
 def predictDamage(path):
+    import cv2  # Lazy import
+    import matplotlib.pyplot as plt  # Lazy import
+    import numpy as np  # Lazy import
+    
     cost = 0
     frame = cv2.imread(path)#read test image
     model = get_yolo_model()
