@@ -19,6 +19,9 @@ import io
 from django.core.mail import send_mail
 from django.conf import settings
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Global session variables replaced by Django session framework
 # request.session['uname'] -> Citizen/Admin username
@@ -26,12 +29,13 @@ import json
 # request.session['oname'] -> Officer username
 
 DB_CONFIG = {
-    'host': '127.0.0.1',
-    'port': 3306,
-    'user': 'root',
-    'password': 'BhardwajSai@123',
-    'database': 'smartcity',
-    'charset': 'utf8'
+    'host': os.getenv('DB_HOST', '127.0.0.1'),
+    'port': int(os.getenv('DB_PORT', 3306)),
+    'user': os.getenv('DB_USER', 'root'),
+    'password': os.getenv('DB_PASSWORD', 'BhardwajSai@123'),
+    'database': os.getenv('DB_NAME', 'smartcity'),
+    'charset': 'utf8',
+    'ssl': {'ssl_mode': 'REQUIRED'} if os.getenv('DB_SSL', 'False') == 'True' else None
 }
 
 CONFIDENCE_THRESHOLD = 0.35
@@ -849,12 +853,12 @@ def AddMunicipalityAction(request):
             
         municipality = request.POST.get('t1', False)
         city = request.POST.get('t2', False)
-        ename = request.POST.get('t3', False)
-        dept_contact = request.POST.get('t4', False)
-        emp_contact = request.POST.get('t5', False)
-        user = request.POST.get('t6', False)
-        password = request.POST.get('t7', False)
-        desc = request.POST.get('t8', False) 
+        ename = request.POST.get('emp', False)
+        dept_contact = request.POST.get('t3', False)
+        emp_contact = request.POST.get('t4', False)
+        user = request.POST.get('t5', False)
+        password = request.POST.get('t6', False)
+        desc = request.POST.get('t7', False) 
         status = 'none'
         con = pymysql.connect(**DB_CONFIG)
         with con:
@@ -891,9 +895,9 @@ def UpdateMunicipalityAction(request):
             
         mname = request.POST.get('t1', False) # Readonly
         city = request.POST.get('t2', False)
-        ename = request.POST.get('t3', False)
-        dept_contact = request.POST.get('t4', False)
-        emp_contact = request.POST.get('t5', False)
+        ename = request.POST.get('emp', False)
+        dept_contact = request.POST.get('t3', False)
+        emp_contact = request.POST.get('t4', False)
         password = request.POST.get('t6', False)
         desc = request.POST.get('t7', False)
         
@@ -1084,14 +1088,29 @@ def UpdateComplaint(request):
         con = pymysql.connect(**DB_CONFIG)
         with con:
             cur = con.cursor()
-            cur.execute(f"select description, category, priority from complaint where complaint_id='{cid}'")
+            cur.execute(f"select description, category, priority, status from complaint where complaint_id='{cid}'")
             row = cur.fetchone()
             if row:
                 description = row[0]
                 category = row[1]
                 priority = row[2]
-        context = {'cid': cid, 'description': description, 'category': category, 'priority': priority}
-        return render(request, 'UpdateComplaint.html', context)
+                status = row[3]
+        context = {
+            'cid': cid,
+            'description': description,
+            'cat_road': category == "Road Damage",
+            'cat_sanitation': category == "Sanitation",
+            'cat_water': category == "Drinking Water",
+            'cat_garbage': category == "Garbage",
+            'cat_other': category == "Other",
+            'prio_high': priority == "High",
+            'prio_medium': priority == "Medium",
+            'prio_low': priority == "Low",
+            'stat_pending': status == "Pending",
+            'stat_progress': status == "In Progress",
+            'stat_resolved': status == "Resolved",
+        }
+        return render(request, 'UpdateComplaint_final.html', context)
 
 def UpdateComplaintAction(request):
     if request.method == 'POST':
@@ -1099,10 +1118,11 @@ def UpdateComplaintAction(request):
         description = request.POST.get('t1', False)
         category = request.POST.get('t2', False)
         priority = request.POST.get('t3', False)
+        status = request.POST.get('t4', False)
         
         db_connection = pymysql.connect(**DB_CONFIG)
         db_cursor = db_connection.cursor()
-        sql = f"update complaint set description='{description}', category='{category}', priority='{priority}' where complaint_id='{cid}'"
+        sql = f"update complaint set description='{description}', category='{category}', priority='{priority}', status='{status}' where complaint_id='{cid}'"
         db_cursor.execute(sql)
         db_connection.commit()
         

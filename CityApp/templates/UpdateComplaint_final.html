@@ -40,21 +40,29 @@
         <div class="form-group">
             <label for="category">Category</label>
             <select name="t2" id="category">
-                <option value="Road Damage" {% if category=="Road Damage" %}selected{% endif %}>Road Damage</option>
-                <option value="Sanitation" {% if category=="Sanitation" %}selected{% endif %}>Sanitation</option>
-                <option value="Drinking Water" {% if category=="Drinking Water" %}selected{% endif %}>Drinking Water
-                </option>
-                <option value="Garbage" {% if category=="Garbage" %}selected{% endif %}>Garbage</option>
-                <option value="Other" {% if category=="Other" %}selected{% endif %}>Other</option>
+                <option value="Road Damage" {% if cat_road %}selected{% endif %}>Road Damage</option>
+                <option value="Sanitation" {% if cat_sanitation %}selected{% endif %}>Sanitation</option>
+                <option value="Drinking Water" {% if cat_water %}selected{% endif %}>Drinking Water</option>
+                <option value="Garbage" {% if cat_garbage %}selected{% endif %}>Garbage</option>
+                <option value="Other" {% if cat_other %}selected{% endif %}>Other</option>
             </select>
         </div>
 
         <div class="form-group">
             <label for="priority">Priority Level</label>
             <select name="t3" id="priority">
-                <option value="High" {% if priority=="High" %}selected{% endif %}>High Priority</option>
-                <option value="Medium" {% if priority=="Medium" %}selected{% endif %}>Medium Priority</option>
-                <option value="Low" {% if priority=="Low" %}selected{% endif %}>Low Priority</option>
+                <option value="High" {% if prio_high %}selected{% endif %}>High Priority</option>
+                <option value="Medium" {% if prio_medium %}selected{% endif %}>Medium Priority</option>
+                <option value="Low" {% if prio_low %}selected{% endif %}>Low Priority</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="status">Complaint Status</label>
+            <select name="t4" id="status">
+                <option value="Pending" {% if stat_pending %}selected{% endif %}>Pending</option>
+                <option value="In Progress" {% if stat_progress %}selected{% endif %}>In Progress</option>
+                <option value="Resolved" {% if stat_resolved %}selected{% endif %}>Resolved</option>
             </select>
         </div>
 

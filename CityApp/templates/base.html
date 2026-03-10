@@ -39,9 +39,9 @@
                             <li class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">
                                 <a href="{% url 'index' %}">Home</a>
                             </li>
-                            <li class="{% if request.resolver_match.url_name == 'AdminLogin' %}active{% endif %}">
+                            <!-- <li class="{% if request.resolver_match.url_name == 'AdminLogin' %}active{% endif %}">
                                 <a href="{% url 'AdminLogin' %}">Super Admin</a>
-                            </li>
+                            </li> -->
                             <li
                                 class="{% if request.resolver_match.url_name == 'MunicipalityLogin' %}active{% endif %}">
                                 <a href="{% url 'MunicipalityLogin' %}">Municipality</a>

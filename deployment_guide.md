@@ -31,7 +31,12 @@ I have already updated your `settings.py` and created `requirements_prod.txt`.
 2.  Create a new **MySQL** service.
 3.  Select the **Free Plan**.
 4.  Once created, copy the **Service URI** or the individual connection details (Host, Port, User, Password, Database).
-5.  **Important**: Update the `DB_CONFIG` in your `views.py` (or use environment variables) with these details.
+5.  **Initialize Tables**: You must create the tables in your new database.
+    - Copy the contents of the `schema.sql` file I just created.
+    - Go to your Aiven Console -> MySQL Service -> **Query Editor** (or use a tool like MySQL Workbench).
+    - Paste the SQL code and click **Run**.
+6.  **Done**: I have already updated `views.py` to use environment variables and created a `.env` file with these credentials for you.
+7.  **Verified**: Your application is now ready to connect to the Aiven MySQL database.
 
 ---
 
