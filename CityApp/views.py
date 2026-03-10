@@ -40,7 +40,16 @@ DB_CONFIG = {
 
 CONFIDENCE_THRESHOLD = 0.35
 GREEN = (0, 255, 0)
-yolo8_model = YOLO("model/yolo8_best.pt")#load and test yolov8 model
+# Deferred model loading to prevent startup hangs on limited hardware (like Render free tier)
+_yolo8_model = None
+def get_yolo_model():
+    global _yolo8_model
+    if _yolo8_model is None:
+        try:
+            _yolo8_model = YOLO("model/yolo8_best.pt")
+        except Exception as e:
+            print(f"Error loading YOLO model: {e}")
+    return _yolo8_model
 
 # Helper function to send email notifications for complaint lifecycle events
 def _send_complaint_update_email(complaint_id, subject, event_description):
@@ -67,7 +76,10 @@ def _send_complaint_update_email(complaint_id, subject, event_description):
 def predictDamage(path):
     cost = 0
     frame = cv2.imread(path)#read test image
-    detections = yolo8_model(frame)[0]#apply yolo model on test image for detection and classifcation
+    model = get_yolo_model()
+    if model is None:
+        return "", "Unknown", "0"
+    detections = model(frame)[0]#apply yolo model on test image for detection and classifcation
     result = 0
     counter = 0
     # loop over the detections
