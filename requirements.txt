@@ -1,0 +1,11 @@
+Django>=4.2.5
+pymysql
+exifread
+opencv-python-headless
+ultralytics
+matplotlib
+numpy
+gunicorn
+whitenoise
+python-dotenv
+dj-database-url

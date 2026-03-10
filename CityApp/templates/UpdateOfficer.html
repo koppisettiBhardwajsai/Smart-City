@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Update Officer - Smart City{% endblock %}
+
+{% block extra_head %}
+<script language="Javascript">
+    function validate() {
+        var y = document.forms["f1"]["t2"].value;
+        var contact = document.forms["f1"]["t3"].value;
+
+        if (y == null || y == "") {
+            window.alert("Password must be entered");
+            document.f1.t2.focus();
+            return false;
+        }
+        if (contact == 0 || isNaN(contact) || contact.length != 10) {
+            alert("Please enter valid 10-digit contact no");
+            document.f1.t3.focus();
+            return false;
+        }
+
+        return true;
+    }
+</script>
+{% endblock %}
+
+{% block nav_items %}
+<ul>
+    <li><a href="{% url 'AddOfficer' %}">Add Officer</a></li>
+    <li class="active"><a href="{% url 'ViewOfficer' %}">View Officers</a></li>
+    <li><a href="{% url 'AssignedTo' %}">Complaints</a></li>
+    <li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="content_bg" style="max-width: 600px; margin: 0 auto;">
+    <div class="text-center mb-4">
+        <h2 style="margin-bottom: 0.5rem; color: var(--gray-900);">Update Officer Details</h2>
+        <p style="color: var(--gray-500); font-size: 0.95rem;">Modify account information for {{ data.0 }}</p>
+    </div>
+
+    {% if msg %}
+    <div class="message error">
+        {{ msg|safe }}
+    </div>
+    {% endif %}
+
+    <form name="f1" method="post" action="{% url 'UpdateOfficerAction' %}" onsubmit="return validate(this);">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="username">Officer Username (Read-only)</label>
+            <input type="text" id="username" name="t1" value="{{ data.0 }}" readonly
+                style="background-color: #f0f0f0; cursor: not-allowed;" />
+        </div>
+
+        <div class="form-group">
+            <label for="password">Portal Password</label>
+            <input type="text" id="password" name="t2" value="{{ data.1 }}" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 2rem;">
+            <label for="contact">Contact Number</label>
+            <input type="text" id="contact" name="t3" value="{{ data.2 }}" />
+        </div>
+
+        <input type="submit" value="Update Officer Account" class="btn-primary" />
+    </form>
+</div>
+{% endblock %}

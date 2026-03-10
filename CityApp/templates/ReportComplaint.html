@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Report Complaint - Smart City{% endblock %}
+
+{% block extra_head %}
+<script language="Javascript">
+	function validate() {
+		var x = document.forms["f1"]["t1"].value;
+		var y = document.forms["f1"]["t5"].value;
+
+		if (x == null || x == "") {
+			window.alert("Complaint description must be entered");
+			document.f1.t1.focus();
+			return false;
+		}
+		if (y == null || y == "") {
+			window.alert("Photo must be uploaded");
+			document.f1.t5.focus();
+			return false;
+		}
+
+		// Show loader before submitting
+		showLoader();
+		return true;
+	}
+
+	function showLoader() {
+		// Hide the form container completely
+		const formContainer = document.getElementById('complaintFormContainer');
+		if (formContainer) {
+			formContainer.style.display = 'none';
+		}
+
+		// Show the loader and FORCE styles to ensure it works
+		const loader = document.getElementById('aiLoader');
+		if (loader) {
+			// Apply critical styles directly to element to override any CSS issues
+			loader.style.display = 'flex';
+			loader.style.position = 'fixed';
+			loader.style.top = '0';
+			loader.style.left = '0';
+			loader.style.width = '100%';
+			loader.style.height = '100%';
+			loader.style.zIndex = '99999';
+			loader.style.backgroundColor = 'rgba(0, 0, 0, 0.85)'; // Dark glass background
+			loader.style.backdropFilter = 'blur(10px)';
+			loader.style.alignItems = 'center';
+			loader.style.justifyContent = 'center';
+
+			// Append to body to ensure it's on top of everything
+			document.body.appendChild(loader);
+		}
+
+		// Cycle through processing messages
+		const messages = [
+			'Uploading image...',
+			'Analyzing damage patterns...',
+			'Running AI detection model...',
+			'Calculating severity level...',
+			'Estimating repair costs...',
+			'Generating report...'
+		];
+
+		let index = 0;
+		const messageElement = document.getElementById('loaderMessage');
+
+		// Change message every 1.5 seconds
+		const interval = setInterval(function () {
+			index = (index + 1) % messages.length;
+			messageElement.textContent = messages[index];
+		}, 1500);
+	}
+</script>
+{% endblock %}
+
+{% block nav_items %}
+<ul>
+	<li class="active"><a href="{% url 'ReportComplaint' %}">Report Issues</a></li>
+	<li><a href="{% url 'ViewGrievanceStatus' %}">My Complaints</a></li>
+	<li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div id="complaintFormContainer" class="content_bg" style="max-width: 700px; margin: 0 auto;">
+	<div class="text-center mb-4">
+		<h2 style="margin-bottom: 0.5rem; color: var(--gray-900);">File a New Complaint</h2>
+		<p style="color: var(--gray-500); font-size: 0.95rem;">Help us identify and fix issues in your area</p>
+	</div>
+
+	{% if data %}
+	<div class="message error">
+		{{ data|safe }}
+	</div>
+	{% endif %}
+
+	<form name="f1" method="post" action="{% url 'ReportComplaintAction' %}" enctype="multipart/form-data"
+		onsubmit="return validate(this);">
+		{% csrf_token %}
+
+		<div class="form-group">
+			<label for="description">Issue Description</label>
+			<input type="text" id="description" name="t1" placeholder="Briefly describe the problem" />
+		</div>
+
+		<div class="form-group">
+			<label for="category">Category</label>
+			<select name="t2" id="category">
+				<option value="Road Damage">Road Damage</option>
+				<option value="Sanitation">Sanitation</option>
+				<option value="Drinking Water">Drinking Water</option>
+				<option value="Garbage">Garbage</option>
+				<option value="Other">Other</option>
+			</select>
+		</div>
+
+		<!-- Dynamic form fields if any -->
+		{{ data1|safe }}
+
+		<div class="form-group">
+			<label for="priority">Priority Level</label>
+			<select name="t4" id="priority">
+				<option value="High">High Priority</option>
+				<option value="Medium">Medium Priority</option>
+				<option value="Low">Low Priority</option>
+			</select>
+		</div>
+
+		<div class="form-group">
+			<label for="photo">Evidence Photo</label>
+			<input type="file" id="photo" name="t5" accept="image/*"
+				style="padding: 0.5rem; border: 1px dashed var(--gray-300); background: var(--gray-50);" />
+		</div>
+
+		<input type="submit" value="Submit Investigation Request" class="btn-primary" />
+	</form>
+</div>
+
+<!-- AI Processing Loader -->
+<div id="aiLoader" class="loader-overlay" style="display: none;">
+	<div class="loader-content">
+		<div class="loader-spinner">
+			<div class="spinner-ring"></div>
+			<div class="spinner-ring"></div>
+			<div class="spinner-ring"></div>
+			<svg class="loader-icon" width="48" height="48" viewBox="0 0 24 24" fill="none">
+				<path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+					stroke-linejoin="round" />
+				<path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+					stroke-linejoin="round" />
+				<path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+					stroke-linejoin="round" />
+			</svg>
+		</div>
+		<h3 class="loader-title">AI Analysis in Progress</h3>
+		<p id="loaderMessage" class="loader-message">Uploading image...</p>
+		<div class="loader-bar">
+			<div class="loader-bar-fill"></div>
+		</div>
+		<p class="loader-subtitle">Our AI is detecting road damage and calculating severity</p>
+	</div>
+</div>
+{% endblock %}

@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Citizen Registration - Smart City{% endblock %}
+
+{% block extra_head %}
+<script language="Javascript">
+	function checkEmail(t3) {
+		if (/^\w+([\.-]?\w+)*@gmail\.com$/.test(t3)) {
+			return (true)
+		}
+		alert("Invalid E-mail Address! Only @gmail.com addresses are allowed.");
+		return (false);
+	}
+
+	function validate() {
+		var x = document.forms["f1"]["t1"].value;
+		var y = document.forms["f1"]["t2"].value;
+		var contact = document.forms["f1"]["t3"].value;
+		var email = document.forms["f1"]["t4"].value;
+		var address = document.forms["f1"]["t5"].value;
+
+		if (x == null || x == "") {
+			window.alert("Username must be entered");
+			document.f1.t1.focus();
+			return false;
+		}
+		if (y == null || y == "") {
+			window.alert("Password must be entered");
+			document.f1.t2.focus();
+			return false;
+		}
+		if (contact == 0) {
+			alert("Please enter contact no");
+			document.f1.t3.focus();
+			return false;
+		}
+		if (isNaN(contact)) {
+			alert("Contact no must be numeric");
+			document.f1.t3.focus();
+			return false;
+		}
+		if (contact.length != 10) {
+			alert("Contact number must be 10 digits long");
+			document.f1.t3.focus();
+			return false;
+		}
+		if (email == 0) {
+			alert("Please Enter Email ID");
+			document.f1.t4.focus();
+			return false;
+		}
+		if (!checkEmail(email)) {
+			document.f1.t4.focus();
+			return false;
+		}
+		if (address == null || address == "") {
+			window.alert("Address must be entered");
+			document.f1.t5.focus();
+			return false;
+		}
+		return true;
+	}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="login-split">
+	<div class="login-image">
+		<img src="{% static 'images/login_bg.jpg' %}" alt="Smart City Infrastructure"
+			style="width: 100%; height: 100%; object-fit: cover;">
+		<div class="login-image-overlay">
+			<h2 style="color: white; font-size: 2.5rem; margin-bottom: 1.5rem;">Join Your Digital City</h2>
+			<p style="color: rgba(255,255,255,0.9); font-size: 1.1rem; max-width: 500px;">Create an account to gain full
+				access to civic services. Help us make your neighborhood better by reporting issues and tracking their
+				resolution directly from your device.</p>
+		</div>
+	</div>
+	<div class="login-form-container">
+		<div style="max-width: 500px; width: 100%; margin: 0 auto;">
+			<div style="text-align: center; margin-bottom: 2rem;">
+				<div
+					style="width: 64px; height: 64px; background: rgba(67, 97, 238, 0.1); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+					<svg width="32" height="32" fill="none" stroke="var(--primary)" stroke-width="2"
+						viewBox="0 0 24 24">
+						<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+						<circle cx="8.5" cy="7" r="4" />
+						<polyline points="17 11 19 13 23 9" />
+					</svg>
+				</div>
+				<h2 style="margin-bottom: 0.5rem; color: var(--gray-900);">Citizen Signup</h2>
+				<p style="color: var(--gray-500); font-size: 0.95rem;">Build a better city together</p>
+			</div>
+
+			{% if data %}
+			<div
+				style="background: rgba(239, 68, 68, 0.1); color: var(--error); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.5rem; font-size: 0.9rem;">
+				{{ data|safe }}
+			</div>
+			{% endif %}
+
+			<form name="f1" method="post" action="{% url 'RegisterAction' %}" onsubmit="return validate(this);">
+				{% csrf_token %}
+
+				<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+					<div class="form-group mb-0">
+						<label for="username">Username</label>
+						<input type="text" id="username" name="t1" placeholder="Username" />
+					</div>
+					<div class="form-group mb-0">
+						<label for="password">Password</label>
+						<input type="password" id="password" name="t2" placeholder="Password" />
+					</div>
+				</div>
+
+				<div class="form-group">
+					<label for="contact">Contact No</label>
+					<input type="text" id="contact" name="t3" placeholder="10-digit mobile number" />
+				</div>
+
+				<div class="form-group">
+					<label for="email">Email ID</label>
+					<input type="email" id="email" name="t4" placeholder="your.email@example.com" />
+				</div>
+
+				<div class="form-group" style="margin-bottom: 2rem;">
+					<label for="address">Address</label>
+					<textarea id="address" name="t5" placeholder="Your residential address"
+						style="min-height: 80px;"></textarea>
+				</div>
+
+				<input type="submit" value="Complete Registration" class="btn-primary" />
+
+				<p
+					style="text-align: center; margin-top: 1.5rem; margin-bottom: 0; color: var(--gray-500); font-size: 0.9rem;">
+					Already have an account? <a href="{% url 'UserLogin' %}"
+						style="font-weight: 600; color: var(--primary); text-decoration: none;">Login here</a>
+				</p>
+			</form>
+		</div>
+	</div>
+</div>
+{% endblock %}

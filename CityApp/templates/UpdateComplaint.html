@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Update Complaint - Smart City{% endblock %}
+
+{% block nav_items %}
+<ul>
+    <li><a href="{% url 'ViewCitizens' %}">Citizens</a></li>
+    <li><a href="{% url 'ViewMunicipality' %}">Municipalities</a></li>
+    <li class="active"><a href="{% url 'ViewUserComplaint' %}">All Complaints</a></li>
+    <li><a href="{% url 'Broadcast' %}">Broadcast</a></li>
+    <li><a href="{% url 'Graph' %}">Analytics</a></li>
+    <li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="content_bg" style="max-width: 600px; margin: 0 auto;">
+    <div class="text-center mb-4">
+        <h2 style="margin-bottom: 0.5rem; color: var(--gray-900);">Update Complaint Details</h2>
+        <p style="color: var(--gray-500); font-size: 0.95rem;">Editing Complaint #{{ cid }}</p>
+    </div>
+
+    {% if data %}
+    <div class="message info">
+        {{ data|safe }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'UpdateComplaintAction' %}">
+        {% csrf_token %}
+        <input type="hidden" name="cid" value="{{ cid }}">
+
+        <div class="form-group">
+            <label for="description">Complaint Description</label>
+            <textarea id="description" name="t1" rows="4"
+                style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--gray-200); font-family: inherit;">{{ description }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="category">Category</label>
+            <select name="t2" id="category">
+                <option value="Road Damage" {% if category=='Road Damage' %}selected{% endif %}>Road Damage</option>
+                <option value="Sanitation" {% if category=='Sanitation' %}selected{% endif %}>Sanitation</option>
+                <option value="Drinking Water" {% if category=='Drinking Water' %}selected{% endif %}>Drinking Water
+                </option>
+                <option value="Garbage" {% if category=='Garbage' %}selected{% endif %}>Garbage</option>
+                <option value="Other" {% if category=='Other' %}selected{% endif %}>Other</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="priority">Priority Level</label>
+            <select name="t3" id="priority">
+                <option value="High" {% if priority=='High' %}selected{% endif %}>High Priority</option>
+                <option value="Medium" {% if priority=='Medium' %}selected{% endif %}>Medium Priority</option>
+                <option value="Low" {% if priority=='Low' %}selected{% endif %}>Low Priority</option>
+            </select>
+        </div>
+
+        <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+            <input type="submit" value="Update Complaint" class="btn-primary" style="flex: 2;" />
+            <a href="{% url 'ViewUserComplaint' %}" class="btn"
+                style="flex: 1; text-align: center; background: var(--gray-200); color: var(--gray-700);">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

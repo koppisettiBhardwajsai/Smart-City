@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Super Admin Dashboard - Smart City{% endblock %}
+
+{% block nav_items %}
+<ul>
+  <li><a href="{% url 'AddMunicipality' %}">Add Municipality</a></li>
+  <li><a href="{% url 'ViewMunicipality' %}">Municipalities</a></li>
+  <li><a href="{% url 'ViewUserComplaint' %}">Complaints</a></li>
+  <li><a href="{% url 'ViewCitizens' %}">Citizens</a></li>
+  <li><a href="{% url 'Broadcast' %}">Broadcast</a></li>
+  <li><a href="{% url 'Graph' %}">Analytics</a></li>
+  <li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<!-- Admin Header -->
+<div class="welcome-banner" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+  <h2 style="color: white; font-size: 2rem; margin-bottom: 0.5rem; font-weight: 700;">Super Admin Control Center</h2>
+  <p style="color: rgba(255,255,255,0.9); font-size: 1.125rem; margin: 0;">Manage municipalities, monitor complaints,
+    and view analytics</p>
+</div>
+
+<!-- Quick Action Cards -->
+<div class="grid-3 mb-5">
+  <a href="{% url 'AddMunicipality' %}" class="dashboard-card">
+    <div class="card-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+      <svg width="28" height="28" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16" />
+        <path d="M1 21h22" />
+        <path d="M14 11h-4" />
+        <path d="M12 9v4" />
+      </svg>
+    </div>
+    <h3>Add Municipality</h3>
+    <p>Register new municipal department</p>
+  </a>
+
+  <a href="{% url 'ViewMunicipality' %}" class="dashboard-card">
+    <div class="card-icon" style="background: linear-gradient(135deg, var(--secondary), var(--primary));">
+      <svg width="28" height="28" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16" />
+        <path d="M1 21h22" />
+      </svg>
+    </div>
+    <h3>View Municipalities</h3>
+    <p>Manage all registered departments</p>
+  </a>
+
+  <a href="{% url 'ViewUserComplaint' %}" class="dashboard-card">
+    <div class="card-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+      <svg width="28" height="28" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10 9 9 9 8 9" />
+      </svg>
+    </div>
+    <h3>All Complaints</h3>
+    <p>Monitor citizen grievances</p>
+  </a>
+</div>
+
+<!-- Dashboard Content -->
+{% if data %}
+<div class="content_bg mb-5">
+  <div class="table-container">
+    {{ data|safe }}
+  </div>
+</div>
+{% endif %}
+
+{% if img %}
+<div class="text-center mb-5">
+  <div class="content_bg" style="display: inline-block;">
+    <h3 style="margin-bottom: 1.5rem; color: var(--gray-700);">Analytics Overview</h3>
+    <img src="data:image/png;base64,{{ img }}" alt="Analytics Graph"
+      style="max-width: 100%; height: auto; border-radius: var(--radius-lg);" />
+  </div>
+</div>
+{% endif %}
+{% endblock %}

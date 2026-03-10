@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Municipality Dashboard - Smart City{% endblock %}
+
+{% block nav_items %}
+<ul>
+  <li><a href="{% url 'AddOfficer' %}">Add Officer</a></li>
+  <li><a href="{% url 'ViewOfficer' %}">View Officers</a></li>
+  <li><a href="{% url 'ComplaintRequest' %}">Complaints</a></li>
+  <li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<!-- Municipality Header -->
+<div class="welcome-banner" style="background: linear-gradient(135deg, #06b6d4, #0891b2);">
+  <h2 style="color: white; font-size: 2rem; margin-bottom: 0.5rem; font-weight: 700;">Municipality Dashboard</h2>
+  <p style="color: rgba(255,255,255,0.9); font-size: 1.125rem; margin: 0;">Manage field officers and coordinate
+    complaint resolutions</p>
+</div>
+
+<!-- Quick Action Cards -->
+<div class="grid-3 mb-5">
+  <a href="{% url 'AddOfficer' %}" class="dashboard-card">
+    <div class="card-icon" style="background: linear-gradient(135deg, #06b6d4, #0891b2);">
+      <svg width="28" height="28" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="8.5" cy="7" r="4" />
+        <line x1="20" y1="8" x2="20" y2="14" />
+        <line x1="23" y1="11" x2="17" y2="11" />
+      </svg>
+    </div>
+    <h3>Add Field Officer</h3>
+    <p>Register new field response officer</p>
+  </a>
+
+  <a href="{% url 'ViewOfficer' %}" class="dashboard-card">
+    <div class="card-icon" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark));">
+      <svg width="28" height="28" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    </div>
+    <h3>All Officers</h3>
+    <p>View and manage field officers</p>
+  </a>
+
+  <a href="{% url 'ComplaintRequest' %}" class="dashboard-card">
+    <div class="card-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+      <svg width="28" height="28" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+        <polyline points="9 11 12 14 22 4" />
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      </svg>
+    </div>
+    <h3>Assigned Complaints</h3>
+    <p>View and assign grievances</p>
+  </a>
+</div>
+
+<!-- Dashboard Content -->
+{% if data %}
+<div class="content_bg mb-5">
+  <div class="table-container">
+    {{ data|safe }}
+  </div>
+</div>
+{% endif %}
+
+{% if img %}
+<div class="text-center mb-5">
+  <div class="content_bg" style="display: inline-block;">
+    <h3 style="margin-bottom: 1.5rem; color: var(--gray-700);">Department Overview</h3>
+    <img src="data:image/png;base64,{{ img }}" alt="Data Visualization"
+      style="max-width: 100%; height: auto; border-radius: var(--radius-lg);" />
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Assign Work to Officer - Smart City{% endblock %}
+
+{% block extra_head %}
+<script language="Javascript">
+	function validate() {
+		var x = document.forms["f1"]["t3"].value;
+
+		if (x == null || x == "") {
+			window.alert("Work cost must be entered");
+			document.f1.t3.focus();
+			return false;
+		}
+		return true;
+	}
+</script>
+{% endblock %}
+
+{% block nav_items %}
+<ul>
+	<li><a href="{% url 'AddOfficer' %}">Add Officer</a></li>
+	<li><a href="{% url 'ViewOfficer' %}">View Officers</a></li>
+	<li class="active"><a href="{% url 'AssignedTo' %}">Complaints</a></li>
+	<li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="content_bg" style="max-width: 800px; margin: 0 auto;">
+	<div class="text-center mb-4">
+		<h2 style="margin-bottom: 0.5rem; color: var(--gray-900);">Resource Assignment</h2>
+		<p style="color: var(--gray-500); font-size: 0.95rem;">Delegate resolution tasks to field officers</p>
+	</div>
+
+	{% if data %}
+	<div class="message info">
+		{{ data|safe }}
+	</div>
+	{% endif %}
+
+	<form name="f1" method="post" action="{% url 'AssignedToAction' %}" onsubmit="return validate(this);">
+		{% csrf_token %}
+
+		<div class="table-container">
+			<table class="data-table">
+				{{ data1|safe }}
+
+				<tr>
+					<td colspan="2" style="text-align: right; border-bottom: none;">
+						<input type="submit" value="Finalize Assignment" class="btn-primary"
+							style="width: auto; padding: 0.75rem 2rem;" />
+					</td>
+				</tr>
+			</table>
+		</div>
+	</form>
+</div>
+{% endblock %}

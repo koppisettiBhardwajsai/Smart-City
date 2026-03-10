@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Update Citizen - Smart City{% endblock %}
+
+{% block extra_head %}
+<script language="Javascript">
+    function checkEmail(t3) {
+        if (/^\w+([\.-]?\w+)*@gmail\.com$/.test(t3)) {
+            return (true)
+        }
+        alert("Invalid E-mail Address! Only @gmail.com addresses are allowed.");
+        return (false);
+    }
+
+    function validate() {
+        var x = document.forms["f1"]["t1"].value;
+        var y = document.forms["f1"]["t2"].value;
+        var contact = document.forms["f1"]["t3"].value;
+        var email = document.forms["f1"]["t4"].value;
+        var address = document.forms["f1"]["t5"].value;
+
+        if (x == null || x == "") {
+            window.alert("Username must be entered");
+            document.f1.t1.focus();
+            return false;
+        }
+        if (y == null || y == "") {
+            window.alert("Password must be entered");
+            document.f1.t2.focus();
+            return false;
+        }
+        if (contact == 0 || isNaN(contact) || contact.length != 10) {
+            alert("Please enter valid 10-digit contact no");
+            document.f1.t3.focus();
+            return false;
+        }
+        if (email == 0) {
+            alert("Please Enter Email ID");
+            document.f1.t4.focus();
+            return false;
+        }
+        if (!checkEmail(email)) {
+            document.f1.t4.focus();
+            return false;
+        }
+        if (address == null || address == "") {
+            window.alert("Address must be entered");
+            document.f1.t5.focus();
+            return false;
+        }
+        return true;
+    }
+</script>
+{% endblock %}
+
+{% block nav_items %}
+<ul>
+    <li><a href="{% url 'AddMunicipality' %}">Add Municipality</a></li>
+    <li><a href="{% url 'ViewMunicipality' %}">Municipalities</a></li>
+    <li><a href="{% url 'ViewUserComplaint' %}">Complaints</a></li>
+    <li class="active"><a href="{% url 'ViewCitizens' %}">Citizens</a></li>
+    <li><a href="{% url 'Broadcast' %}">Broadcast</a></li>
+    <li><a href="{% url 'Graph' %}">Analytics</a></li>
+    <li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="content_bg" style="max-width: 600px; margin: 0 auto;">
+    <div class="text-center mb-5">
+        <h2 style="margin-bottom: 0.5rem; color: var(--gray-900);">Update Citizen Details</h2>
+        <p style="color: var(--gray-500); font-size: 0.95rem;">Modify information for <strong>{{ data.0 }}</strong></p>
+    </div>
+
+    {% if msg %}
+    <div class="message error">
+        {{ msg|safe }}
+    </div>
+    {% endif %}
+
+    <form name="f1" method="post" action="{% url 'UpdateCitizenAction' %}" onsubmit="return validate(this);">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="username">Username (Read-only)</label>
+            <input type="text" id="username" name="t1" value="{{ data.0 }}" readonly style="background-color: #f0f0f0; cursor: not-allowed;" />
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="text" id="password" name="t2" value="{{ data.1 }}" />
+        </div>
+
+        <div class="form-group">
+            <label for="contact">Contact No</label>
+            <input type="text" id="contact" name="t3" value="{{ data.2 }}" />
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email ID</label>
+            <input type="email" id="email" name="t4" value="{{ data.3 }}" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 2rem;">
+            <label for="address">Address</label>
+            <textarea id="address" name="t5" style="min-height: 100px;">{{ data.4 }}</textarea>
+        </div>
+
+        <div class="text-center">
+            <input type="submit" value="Update Citizen Information" class="btn-primary" style="width: 100%;" />
+        </div>
+    </form>
+</div>
+{% endblock %}

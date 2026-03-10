@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Update Municipality - Smart City{% endblock %}
+
+{% block extra_head %}
+<script language="Javascript">
+    function checkEmail(t3) {
+        if (/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(t3)) {
+            return (true)
+        }
+        alert("Invalid E-mail Address! Please re-enter.");
+        return (false);
+    }
+
+    function validate() {
+        var x = document.forms["f1"]["t1"].value;
+        var y = document.forms["f1"]["t2"].value;
+        var emp = document.forms["f1"]["emp"].value;
+        var contact = document.forms["f1"]["t3"].value;
+        var email = document.forms["f1"]["t4"].value;
+        var pass = document.forms["f1"]["t6"].value;
+        var desc = document.forms["f1"]["t7"].value;
+
+        if (x == null || x == "") {
+            window.alert("Municipality name must be entered");
+            document.f1.t1.focus();
+            return false;
+        }
+        if (y == null || y == "") {
+            window.alert("City name must be entered");
+            document.f1.t2.focus();
+            return false;
+        }
+        if (emp == null || emp == "") {
+            window.alert("Employee name must be entered");
+            document.f1.emp.focus();
+            return false;
+        }
+        if (contact == 0 || isNaN(contact) || contact.length != 10) {
+            alert("Please enter valid 10-digit department contact no");
+            document.f1.t3.focus();
+            return false;
+        }
+        if (email == 0 || isNaN(email) || email.length != 10) {
+            alert("Please enter valid 10-digit employee contact no");
+            document.f1.t4.focus();
+            return false;
+        }
+        if (pass == null || pass == "") {
+            window.alert("Password must be entered");
+            document.f1.t6.focus();
+            return false;
+        }
+        if (desc == null || desc == "") {
+            window.alert("Department description must be entered");
+            document.f1.t7.focus();
+            return false;
+        }
+        return true;
+    }
+</script>
+{% endblock %}
+
+{% block nav_items %}
+<ul>
+    <li><a href="{% url 'AddMunicipality' %}">Add Municipality</a></li>
+    <li class="active"><a href="{% url 'ViewMunicipality' %}">Municipalities</a></li>
+    <li><a href="{% url 'ViewUserComplaint' %}">Complaints</a></li>
+    <li><a href="{% url 'ViewCitizens' %}">Citizens</a></li>
+    <li><a href="{% url 'Broadcast' %}">Broadcast</a></li>
+    <li><a href="{% url 'Graph' %}">Analytics</a></li>
+    <li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="content_bg" style="max-width: 800px; margin: 0 auto;">
+    <div class="text-center mb-5">
+        <h2 style="margin-bottom: 0.5rem; color: var(--gray-900);">Update Department Details</h2>
+        <p style="color: var(--gray-500); font-size: 0.95rem;">Modify information for {{ data.0 }}</p>
+    </div>
+
+    {% if msg %}
+    <div class="message error">
+        {{ msg|safe }}
+    </div>
+    {% endif %}
+
+    <form name="f1" method="post" action="{% url 'UpdateMunicipalityAction' %}" onsubmit="return validate(this);">
+        {% csrf_token %}
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <div style="grid-column: span 2;">
+                <h3
+                    style="font-size: 1rem; border-bottom: 1px solid var(--gray-200); padding-bottom: 0.5rem; margin-bottom: 1rem; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.05em;">
+                    Department Information</h3>
+            </div>
+            <div class="form-group mb-0">
+                <label for="muni_name">Municipality Name</label>
+                <input type="text" id="muni_name" name="t1" value="{{ data.0 }}" />
+            </div>
+            <div class="form-group mb-0">
+                <label for="city_name">City Name</label>
+                <input type="text" id="city_name" name="t2" value="{{ data.1 }}" />
+            </div>
+            <div class="form-group mb-0" style="grid-column: span 2;">
+                <label for="description">Department Description</label>
+                <textarea id="description" name="t7" style="min-height: 80px;">{{ data.7 }}</textarea>
+            </div>
+
+            <div style="grid-column: span 2; margin-top: 1rem;">
+                <h3
+                    style="font-size: 1rem; border-bottom: 1px solid var(--gray-200); padding-bottom: 0.5rem; margin-bottom: 1rem; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.05em;">
+                    Point of Contact</h3>
+            </div>
+            <div class="form-group mb-0">
+                <label for="emp_name">Employee Name</label>
+                <input type="text" id="emp_name" name="emp" value="{{ data.2 }}" />
+            </div>
+            <div class="form-group mb-0">
+                <label for="muni_contact">Department Contact</label>
+                <input type="text" id="muni_contact" name="t3" value="{{ data.3 }}" />
+            </div>
+            <div class="form-group mb-0" style="grid-column: span 2;">
+                <label for="emp_contact">Employee Mobile</label>
+                <input type="text" id="emp_contact" name="t4" value="{{ data.4 }}" />
+            </div>
+
+            <div style="grid-column: span 2; margin-top: 1rem;">
+                <h3
+                    style="font-size: 1rem; border-bottom: 1px solid var(--gray-200); padding-bottom: 0.5rem; margin-bottom: 1rem; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.05em;">
+                    Access Credentials</h3>
+            </div>
+            <div class="form-group mb-0">
+                <label for="username">Portal Username (Read-only)</label>
+                <input type="text" id="username" name="t5" value="{{ data.5 }}" readonly
+                    style="background-color: #f0f0f0; cursor: not-allowed;" />
+            </div>
+            <div class="form-group mb-0">
+                <label for="password">Portal Password</label>
+                <input type="text" id="password" name="t6" value="{{ data.6 }}" />
+            </div>
+        </div>
+
+        <div style="margin-top: 2rem;">
+            <input type="submit" value="Update Department Details" class="btn-primary" />
+        </div>
+    </form>
+</div>
+{% endblock %}

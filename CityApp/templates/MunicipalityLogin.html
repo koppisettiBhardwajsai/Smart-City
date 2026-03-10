@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Municipality Admin Login - Smart City{% endblock %}
+
+{% block extra_head %}
+<script language="Javascript">
+	function validate() {
+		var x = document.forms["f1"]["t1"].value;
+		var y = document.forms["f1"]["t2"].value;
+
+		if (x == null || x == "") {
+			window.alert("Username must be entered");
+			document.f1.t1.focus();
+			return false;
+		}
+		if (y == null || y == "") {
+			window.alert("Password must be entered");
+			document.f1.t2.focus();
+			return false;
+		}
+		return true;
+	}
+</script>
+{% endblock %}
+
+{% block nav_items %}
+<ul>
+	<li><a href="{% url 'index' %}">Home</a></li>
+	<li><a href="{% url 'AdminLogin' %}">Super Admin</a></li>
+	<li class="active"><a href="{% url 'MunicipalityLogin' %}">Municipality</a></li>
+	<li><a href="{% url 'OfficerLogin' %}">Officer</a></li>
+	<li><a href="{% url 'UserLogin' %}">Citizen Login</a></li>
+	<li><a href="{% url 'Register' %}">Sign Up</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="login-split">
+	<div class="login-image">
+		<img src="{% static 'images/login_bg.jpg' %}" alt="Smart City Infrastructure"
+			style="width: 100%; height: 100%; object-fit: cover;">
+		<div class="login-image-overlay">
+			<h2 style="color: white; font-size: 2.5rem; margin-bottom: 1.5rem;">Local Government Portal</h2>
+			<p style="color: rgba(255,255,255,0.9); font-size: 1.1rem; max-width: 500px;">Assigned to manage local
+				infrastructure, sanitation, and utilities. Coordinate with field officers for rapid resolution of
+				citizen grievances.</p>
+		</div>
+	</div>
+	<div class="login-form-container">
+		<div style="max-width: 400px; width: 100%; margin: 0 auto;">
+			<div style="text-align: center; margin-bottom: 2rem;">
+				<div
+					style="width: 64px; height: 64px; background: rgba(67, 97, 238, 0.1); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+					<svg width="32" height="32" fill="none" stroke="var(--primary)" stroke-width="2"
+						viewBox="0 0 24 24">
+						<path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16" />
+						<path d="M1 21h22" />
+					</svg>
+				</div>
+				<h2 style="margin-bottom: 0.5rem; color: var(--gray-900);">Municipality Admin</h2>
+				<p style="color: var(--gray-500); font-size: 0.95rem;">Department Management Access</p>
+			</div>
+
+			{% if data %}
+			<div
+				style="background: rgba(239, 68, 68, 0.1); color: var(--error); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.5rem; font-size: 0.9rem;">
+				{{ data|safe }}
+			</div>
+			{% endif %}
+
+			<form name="f1" method="post" action="{% url 'MunicipalityLoginAction' %}"
+				onsubmit="return validate(this);">
+				{% csrf_token %}
+
+				<div class="form-group">
+					<label for="username">Municipality Username</label>
+					<input type="text" id="username" name="t1" placeholder="Enter municipality username" />
+				</div>
+
+				<div class="form-group" style="margin-bottom: 2rem;">
+					<label for="password">Password</label>
+					<input type="password" id="password" name="t2" placeholder="Enter password" />
+				</div>
+
+				<input type="submit" value="Login to Department" class="btn-primary" />
+			</form>
+		</div>
+	</div>
+</div>
+{% endblock %}

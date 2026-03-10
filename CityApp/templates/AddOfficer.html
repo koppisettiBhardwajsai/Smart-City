@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Add Field Officer - Smart City{% endblock %}
+
+{% block extra_head %}
+<script language="Javascript">
+	function validate() {
+		var x = document.forms["f1"]["t1"].value;
+		var y = document.forms["f1"]["t2"].value;
+		var contact = document.forms["f1"]["t3"].value;
+
+		if (x == null || x == "") {
+			window.alert("Username must be entered");
+			document.f1.t1.focus();
+			return false;
+		}
+		if (y == null || y == "") {
+			window.alert("Password must be entered");
+			document.f1.t2.focus();
+			return false;
+		}
+		if (contact == 0) {
+			alert("Please enter contact no");
+			document.f1.t3.focus();
+			return false;
+		}
+		if (isNaN(contact)) {
+			alert("Contact no must be numeric");
+			document.f1.t3.focus();
+			return false;
+		}
+		if (contact.length != 10) {
+			alert("Contact number must be 10 digits long");
+			document.f1.t3.focus();
+			return false;
+		}
+
+		return true;
+	}
+</script>
+{% endblock %}
+
+{% block nav_items %}
+<ul>
+	<li class="active"><a href="{% url 'AddOfficer' %}">Add Officer</a></li>
+	<li><a href="{% url 'ViewOfficer' %}">View Officers</a></li>
+	<li><a href="{% url 'AssignedTo' %}">Complaints</a></li>
+	<li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="content_bg" style="max-width: 600px; margin: 0 auto;">
+	<div class="text-center mb-4">
+		<h2 style="margin-bottom: 0.5rem; color: var(--gray-900);">Register Field Officer</h2>
+		<p style="color: var(--gray-500); font-size: 0.95rem;">Onboard new responders to the resolution team</p>
+	</div>
+
+	{% if data %}
+	<div class="message error">
+		{{ data|safe }}
+	</div>
+	{% endif %}
+
+	<form name="f1" method="post" action="{% url 'AddOfficerAction' %}" onsubmit="return validate(this);">
+		{% csrf_token %}
+
+		<div class="form-group">
+			<label for="username">Officer Username</label>
+			<input type="text" id="username" name="t1" placeholder="Create username" />
+		</div>
+
+		<div class="form-group">
+			<label for="password">Portal Password</label>
+			<input type="password" id="password" name="t2" placeholder="Create password" />
+		</div>
+
+		<div class="form-group" style="margin-bottom: 2rem;">
+			<label for="contact">Contact Number</label>
+			<input type="text" id="contact" name="t3" placeholder="10-digit mobile number" />
+		</div>
+
+		<input type="submit" value="Authorize & Create Officer Account" class="btn-primary" />
+	</form>
+</div>
+{% endblock %}

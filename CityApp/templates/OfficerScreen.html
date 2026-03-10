@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Officer Dashboard - Smart City{% endblock %}
+
+{% block nav_items %}
+<ul>
+  <li><a href="{% url 'ViewTask' %}">My Tasks</a></li>
+  <li><a href="{% url 'index' %}">Logout</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<!-- Officer Header -->
+<div class="welcome-banner" style="background: linear-gradient(135deg, #10b981, #059669);">
+  <h2 style="color: white; font-size: 2rem; margin-bottom: 0.5rem; font-weight: 700;">Field Officer Portal</h2>
+  <p style="color: rgba(255,255,255,0.9); font-size: 1.125rem; margin: 0;">View assigned tasks and update resolution
+    status</p>
+</div>
+
+<!-- Quick Action Cards -->
+<div class="grid-2 mb-5">
+  <a href="{% url 'ViewTask' %}" class="dashboard-card">
+    <div class="card-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+      <svg width="28" height="28" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+      </svg>
+    </div>
+    <h3>Assigned Complaints</h3>
+    <p>View and resolve assigned issues</p>
+  </a>
+
+  <div class="dashboard-card" style="cursor: default; opacity: 0.8;">
+    <div class="card-icon" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark));">
+      <svg width="28" height="28" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    </div>
+    <h3>Quick Response</h3>
+    <p>Update status and upload resolution photos</p>
+  </div>
+</div>
+
+<!-- Dashboard Content -->
+{% if data %}
+<div class="content_bg mb-5">
+  <div class="table-container">
+    {{ data|safe }}
+  </div>
+</div>
+{% endif %}
+
+{% if img %}
+<div class="text-center mb-5">
+  <div class="content_bg" style="display: inline-block;">
+    <h3 style="margin-bottom: 1.5rem; color: var(--gray-700);">Task Overview</h3>
+    <img src="data:image/png;base64,{{ img }}" alt="Data Visualization"
+      style="max-width: 100%; height: auto; border-radius: var(--radius-lg);" />
+  </div>
+</div>
+{% endif %}
+
+<!-- Help Section -->
+{% if not data %}
+<div class="content_bg text-center" style="border-style: dashed;">
+  <svg width="48" height="48" fill="none" stroke="var(--success)" stroke-width="2" viewBox="0 0 24 24"
+    style="margin: 0 auto 1rem;">
+    <polyline points="9 11 12 14 22 4" />
+    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+  </svg>
+  <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">No Tasks Assigned</h3>
+  <p style="color: var(--gray-500); margin-bottom: 0;">You're all caught up! New assignments will appear here when
+    available.</p>
+</div>
+{% endif %}
+{% endblock %}

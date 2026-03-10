@@ -1,0 +1,22 @@
+create database smartcity;
+use smartcity;
+
+create table signup(username varchar(50), password varchar(50),
+contact_no varchar(12),
+email_id varchar(50),
+address varchar(50));
+
+create table complaint(complaint_id int, citizenname varchar(50), description varchar(1000),
+category varchar(100), latitude varchar(30), longitude varchar(30), complaint_date varchar(30),
+municipality_name varchar(40), priority varchar(30), severity varchar(30), cost varchar(30), photo varchar(140), assigned_to varchar(50),status varchar(40));
+
+create table municipality(municipality_name varchar(50), city_name varchar(50), employee_name varchar(50),
+municipality_contact_no varchar(20), employee_contact_no varchar(20), username varchar(50), password varchar(50), 
+municipality_desc varchar(200));
+
+create table fieldofficer(username varchar(50), password varchar(50),
+contact_no varchar(12), municipality_name varchar(50));
+
+
+
+
