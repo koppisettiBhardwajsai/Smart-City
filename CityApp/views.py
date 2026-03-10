@@ -12,6 +12,8 @@ import exifread
 import base64
 import io
 import json
+from django.core.mail import send_mail
+from django.conf import settings
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -1026,10 +1028,12 @@ def UserLogin(request):
         return render(request, 'UserLogin.html', {})
 
 def index(request):
-    if request.method == 'GET':
-        # Flush session on logout
+    # Flush session on logout/entry
+    try:
         request.session.flush()
-        return render(request, 'index.html', {})
+    except:
+        pass
+    return render(request, 'index.html', {})
 
 def Register(request):
     if request.method == 'GET':
