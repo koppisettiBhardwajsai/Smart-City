@@ -234,10 +234,32 @@ def AssignedToAction(request):
         if db_cursor.rowcount == 1:
             status = f'<div class="status-banner success slide-in">Work successfully assigned to: <strong>{emp}</strong></div>'
             # Send Notification Email using helper
-            _send_complaint_update_email(complaint, f"SmartCity: Officer Assigned to Complaint #{complaint}", f"A field officer ({emp}) has been assigned to address your grievance.")
+            try:
+                _send_complaint_update_email(complaint, f"SmartCity: Officer Assigned to Complaint #{complaint}", f"A field officer ({emp}) has been assigned to address your grievance.")
+            except:
+                pass
             
-        context= {'data':status}
-        return render(request, 'MunicipalityScreen.html', context)
+        # Re-fetch the dropdowns so the assigned complaint disappears
+        output = '<tr><td><label>Complaint ID</label></td><td><select name="t1">'
+        with con:
+            cur = con.cursor()
+            cur.execute("select complaint_id from complaint where municipality_name='"+mname+"' and assigned_to='-'")
+            rows = cur.fetchall()
+            for row in rows:
+                output += '<option value="'+str(row[0])+'">'+str(row[0])+'</option>'
+        output += "</select></td></tr>"
+        
+        output += '<tr><td><label>Field Officer</label></td><td><select name="t2">'
+        with con:
+            cur = con.cursor()
+            cur.execute("select username from fieldofficer where municipality_name='"+mname+"'")
+            rows = cur.fetchall()
+            for row in rows:
+                output += '<option value="'+row[0]+'">'+row[0]+'</option>'
+        output += "</select></td></tr>"
+
+        context= {'data':status, 'data1':output}
+        return render(request, 'AssignedTo.html', context)
 
 def AssignedTo(request):
     if request.method == 'GET':
