@@ -78,6 +78,14 @@ def predictDamage(path):
     if frame is None:
         return "", "Unknown", "0"
         
+    # Resize image to save RAM (Render Free Tier limit is 512MB)
+    # Most mobile photos are 3000px+, which can use 100MB+ of RAM
+    h, w = frame.shape[:2]
+    max_dim = 640
+    if h > max_dim or w > max_dim:
+        scale = max_dim / max(h, w)
+        frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        
     model = get_yolo_model()
     if model is None:
         return "", "Unknown", "0"
@@ -94,8 +102,8 @@ def predictDamage(path):
             cv2.putText(frame, "Damage", (xmin, ymin),  cv2.FONT_HERSHEY_SIMPLEX,0.7, (255, 0, 0), 2)
             result = 1
             counter += 1
-            w = (xmax + ymax) / 2
-            cost += w * 100
+            w_box = (xmax + ymax) / 2
+            cost += w_box * 100
             
     if result == 0:
         cv2.putText(frame, 'No Damage Detected', (50, 100),  cv2.FONT_HERSHEY_SIMPLEX,0.7, (255, 0, 0), 2)
@@ -107,6 +115,10 @@ def predictDamage(path):
     # More memory-efficient encoding than plt.savefig
     _, buffer = cv2.imencode('.png', frame)
     img_b64 = base64.b64encode(buffer).decode('utf-8')
+    
+    # Explicit cleanup
+    del frame
+    del buffer
     
     return img_b64, severity, str(int(cost))
 
