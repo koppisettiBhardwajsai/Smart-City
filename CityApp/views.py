@@ -245,13 +245,15 @@ def AssignedTo(request):
         if mname is None:
             return render(request, 'MunicipalityLogin.html', {'data': 'Please login first'})
         output = '<tr><td><label>Complaint ID</label></td><td><select name="t1">'
+        tid = request.GET.get('tid', '')
         con = pymysql.connect(**DB_CONFIG)
         with con:
             cur = con.cursor()
             cur.execute("select complaint_id from complaint where municipality_name='"+mname+"' and assigned_to='-'")
             rows = cur.fetchall()
             for row in rows:
-                output += '<option value="'+str(row[0])+'">'+str(row[0])+'</option>'
+                selected = "selected" if str(row[0]) == str(tid) else ""
+                output += '<option value="'+str(row[0])+'" '+selected+'>'+str(row[0])+'</option>'
         output += "</select></td></tr>"
         
         output += '<tr><td><label>Field Officer</label></td><td><select name="t2">'
@@ -523,6 +525,8 @@ def getCount(category):
             count = row[0]
             break
     return count 
+
+
 
 def Graph(request):
     if request.method == 'GET':
