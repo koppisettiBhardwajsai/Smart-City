@@ -439,41 +439,53 @@ def ReportComplaintAction(request):
             with open(file_path, "wb") as file:
                 file.write(photo)
             
-            # AI & Metadata processing
+            # 1. Save to Database FIRST (Fail-safe)
+            # Default values if AI fails
+            severity = "Low"
+            cost = "0"
+            img = ""
+            lat, long = "0.0", "0.0"
+            
             try:
                 lat, long = get_exif_location(get_exif_data(file_path))
             except:
-                lat, long = "0.0", "0.0"
-                
-            try:
-                img, severity, cost = predictDamage(file_path)
-            except Exception as e:
-                print(f"AI Processing Error: {e}")
-                img, severity, cost = "", "Low", "0"
-            
-            status = "Error in logging your complaint. Please try after sometime"   
-            db_connection = pymysql.connect(**DB_CONFIG)
-            with db_connection:
-                db_cursor = db_connection.cursor()
+                pass
+
+            con_save = pymysql.connect(**DB_CONFIG)
+            with con_save:
+                cur_save = con_save.cursor()
                 query = "INSERT INTO complaint (complaint_id, citizenname, description, category, latitude, longitude, complaint_date, municipality_name, priority, severity, cost, photo, assigned_to, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 data = (ticket, uname, desc, category, lat, long, date.today(), municipality, priority, severity, cost, f"{ticket}.{ext}", "-", "Pending")
-                db_cursor.execute(query, data)
-                db_connection.commit()
+                cur_save.execute(query, data)
+                con_save.commit()
+
+            # 2. Attempt AI Processing SECOND
+            success = False
+            try:
+                img, severity, cost = predictDamage(file_path)
+                # Update the database with AI results
+                with con_save:
+                    cur_update = con_save.cursor()
+                    cur_update.execute("UPDATE complaint SET severity=%s, cost=%s WHERE complaint_id=%s", (severity, cost, ticket))
+                    con_save.commit()
+                success = True
+            except Exception as e:
+                print(f"CRITICAL AI FAILURE (OOM/Timeout): {e}")
+
+            # 3. Notification & Response
+            status = f'<div class="status-banner success slide-in"><h4>Complaint Registered</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p></div>'
+            if success and category == "Road Damage":
+                status = status.replace('</div>', f'<span class="badge info">Automatic Estimated Cost: {cost}</span></div>')
+            elif not success:
+                status = status.replace('Registered', 'Registered (Pending AI Analysis)')
+            
+            # Async email notification
+            try:
+                event_desc = f"Registered & assigned to {municipality}. AI Analysis: {severity}."
+                _send_complaint_update_email(ticket, f"SmartCity: Complaint #{ticket} Registered", event_desc)
+            except:
+                pass
                 
-            if db_cursor.rowcount == 1:
-                status = f'<div class="status-banner success slide-in"><h4>Complaint Registered</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p></div>'
-                if category == "Road Damage":
-                    status = status.replace('</div>', f'<span class="badge info">Automatic Estimated Cost: {cost}</span></div>')
-                
-                # Async-ish email (ignore errors to prevent 500)
-                try:
-                    event_desc = f"Successfully registered and assigned to {municipality}."
-                    if category == "Road Damage":
-                        event_desc += f" Estimated cost: {cost}"
-                    _send_complaint_update_email(ticket, f"SmartCity: Complaint #{ticket} Registered", event_desc)
-                except:
-                    pass
-                    
             context= {'data':status, 'img': img}
             return render(request, 'UserScreen.html', context)
             
