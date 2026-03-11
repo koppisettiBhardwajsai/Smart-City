@@ -241,8 +241,8 @@ def AssignedToAction(request):
             
         # Re-fetch the dropdowns so the assigned complaint disappears
         output = '<tr><td><label>Complaint ID</label></td><td><select name="t1">'
-        with con:
-            cur = con.cursor()
+        with db_connection:
+            cur = db_connection.cursor()
             cur.execute("select complaint_id from complaint where municipality_name='"+mname+"' and assigned_to='-'")
             rows = cur.fetchall()
             for row in rows:
@@ -250,8 +250,8 @@ def AssignedToAction(request):
         output += "</select></td></tr>"
         
         output += '<tr><td><label>Field Officer</label></td><td><select name="t2">'
-        with con:
-            cur = con.cursor()
+        with db_connection:
+            cur = db_connection.cursor()
             cur.execute("select username from fieldofficer where municipality_name='"+mname+"'")
             rows = cur.fetchall()
             for row in rows:
