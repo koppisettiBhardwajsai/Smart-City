@@ -71,50 +71,44 @@ def _send_complaint_update_email(complaint_id, subject, event_description):
 # function to read test image and then detect & predict road damage type
 def predictDamage(path):
     import cv2  # Lazy import
-    import matplotlib.pyplot as plt  # Lazy import
     import numpy as np  # Lazy import
     
     cost = 0
-    frame = cv2.imread(path)#read test image
+    frame = cv2.imread(path)
+    if frame is None:
+        return "", "Unknown", "0"
+        
     model = get_yolo_model()
     if model is None:
         return "", "Unknown", "0"
-    detections = model(frame)[0]#apply yolo model on test image for detection and classifcation
+        
+    detections = model(frame)[0]
     result = 0
     counter = 0
-    # loop over the detections
-    for data in detections.boxes.data.tolist():#loop all predicted classes and write to image
-        # extract the confidence (i.e., probability) associated with the detection
+    
+    for data in detections.boxes.data.tolist():
         confidence = data[4]
-        cls_id = data[5]
-        # filter out weak detections by ensuring the 
-        # confidence is greater than the minimum confidence
         if float(confidence) >= CONFIDENCE_THRESHOLD:
             xmin, ymin, xmax, ymax = int(data[0]), int(data[1]), int(data[2]), int(data[3])
             cv2.rectangle(frame, (xmin, ymin) , (xmax, ymax), GREEN, 2)
             cv2.putText(frame, "Damage", (xmin, ymin),  cv2.FONT_HERSHEY_SIMPLEX,0.7, (255, 0, 0), 2)
             result = 1
             counter += 1
-            w = xmax + ymax
-            w = w / 2
+            w = (xmax + ymax) / 2
             cost += w * 100
+            
     if result == 0:
         cv2.putText(frame, 'No Damage Detected', (50, 100),  cv2.FONT_HERSHEY_SIMPLEX,0.7, (255, 0, 0), 2)
-    severity = "Low"
+    
+    severity = "High" if counter >= 3 else "Low"
     if cost == 0:
         cost = 100000
-    if counter >= 3:
-        severity = "High"
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) 
-    plt.imshow(frame)
-    plt.title("Severity Detection AI Algorithm")
-    plt.axis('off')
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight')
-    img_b64 = base64.b64encode(buf.getvalue()).decode()
-    plt.clf()
-    plt.cla()
-    return img_b64, severity, str(cost)
+        
+    # More memory-efficient encoding than plt.savefig
+    _, buffer = cv2.imencode('.png', frame)
+    img_b64 = base64.b64encode(buffer).decode('utf-8')
+    
+    return img_b64, severity, str(int(cost))
 
 def _get_if_exist(data, key):
     if key in data:
@@ -419,20 +413,30 @@ def ReportComplaintAction(request):
             ticket += 1
         else:
             ticket = 1
-        if os.path.exists('CityApp/static/photo/'+str(ticket)+"."+ext):
-            os.remove('CityApp/static/photo/'+str(ticket)+"."+ext)
-        with open('CityApp/static/photo/'+str(ticket)+"."+ext, "wb") as file:
+        # Ensure directory exists
+        upload_dir = os.path.join('CityApp', 'static', 'photo')
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+            
+        file_path = os.path.join(upload_dir, f"{ticket}.{ext}")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            
+        with open(file_path, "wb") as file:
             file.write(photo)
-        file.close()
-        lat, long = get_exif_location(get_exif_data('CityApp/static/photo/'+str(ticket)+"."+ext))
-        img, severity, cost = predictDamage('CityApp/static/photo/'+str(ticket)+"."+ext)
+            
+        lat, long = get_exif_location(get_exif_data(file_path))
+        img, severity, cost = predictDamage(file_path)
+        
         status = "Error in logging your complaint. Please try after sometime"   
         db_connection = pymysql.connect(**DB_CONFIG)
-        db_cursor = db_connection.cursor()
-        student_sql_query = "INSERT INTO complaint VALUES('"+str(ticket)+"','"+uname+"','"+desc+"','"+category+"','"+lat+"','"+long+"','"+str(date.today())+"','"+municipality+"','"+priority+"','"+severity+"','"+cost+"','"+str(ticket)+"."+ext+"','"+"-"+"','Pending')"
-        db_cursor.execute(student_sql_query)
-        db_connection.commit()
-        print(db_cursor.rowcount, "Record Inserted")
+        with db_connection:
+            db_cursor = db_connection.cursor()
+            query = "INSERT INTO complaint (complaint_id, citizenname, description, category, latitude, longitude, complaint_date, municipality_name, priority, severity, cost, photo, assigned_to, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            data = (ticket, uname, desc, category, lat, long, date.today(), municipality, priority, severity, cost, f"{ticket}.{ext}", "-", "Pending")
+            db_cursor.execute(query, data)
+            db_connection.commit()
+            
         if db_cursor.rowcount == 1:
             status = f'<div class="status-banner success slide-in"><h4>Complaint Registered</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p></div>'
             
