@@ -2,7 +2,7 @@ Django>=4.2.5
 pymysql
 exifread
 opencv-python-headless
-ultralytics
+onnxruntime
 numpy
 gunicorn
 whitenoise

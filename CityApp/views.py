@@ -314,7 +314,7 @@ def ViewGrievanceStatus(request):
                     output += f'<tr><td>{row[0]}</td><td>{row[2]}</td><td>{row[3]}</td>'
                     output += f'<td><small>{row[4]},<br/>{row[5]}</small></td><td>{row[6]}</td><td>{row[7]}</td>'
                     output += f'<td>{row[8]}</td><td>{row[9]}</td><td>{row[10]}</td>'
-                    output += f'<td><img src="/static/photo/{row[11]}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"/></td>'
+                    output += f'<td><img src="/media/photo/{row[11]}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"/></td>'
                     output += f'<td>{row[12]}</td><td><span class="badge info">{row[13]}</span></td>'
                     output += f'<td><a href="javascript:void(0);" onclick="confirmDelete({row[0]})" style="display:inline-block; background:linear-gradient(135deg, #ef476f 0%, #d63654 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-trash"></i></a></td></tr>'
         output += "</tbody></table></div>"
@@ -431,7 +431,8 @@ def ReportComplaintAction(request):
                     ticket = int(row[0]) + 1
             
             # Ensure directory exists (Ephemeral on Render!)
-            upload_dir = os.path.join('CityApp', 'static', 'photo')
+            # Use Media directory for user uploads
+            upload_dir = os.path.join(settings.MEDIA_ROOT, 'photo')
             if not os.path.exists(upload_dir):
                 os.makedirs(upload_dir)
                 
