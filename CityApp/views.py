@@ -389,70 +389,84 @@ def DeleteComplaint(request):
 
 def ReportComplaintAction(request):
     if request.method == 'POST':
-        uname = request.session.get('uname')
-        if uname is None:
-            return render(request, 'UserLogin.html', {'data': 'Please login first'})
-        desc = request.POST.get('t1', False)
-        category = request.POST.get('t2', False)
-        municipality = request.POST.get('t3', False)
-        priority = request.POST.get('t4', False)
-        photo = request.FILES['t5'].read()
-        filename = request.FILES['t5'].name
-        ext = filename.split(".")
-        ext = ext[len(ext)-1]
-        ticket = 0
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute("select max(complaint_id) from complaint")
-            rows = cur.fetchall()
-            for row in rows:
-                ticket = row[0]
-                break
-        if ticket is not None:
-            ticket += 1
-        else:
-            ticket = 1
-        # Ensure directory exists
-        upload_dir = os.path.join('CityApp', 'static', 'photo')
-        if not os.path.exists(upload_dir):
-            os.makedirs(upload_dir)
+        try:
+            uname = request.session.get('uname')
+            if uname is None:
+                return render(request, 'UserLogin.html', {'data': 'Please login first'})
+            desc = request.POST.get('t1', False)
+            category = request.POST.get('t2', False)
+            municipality = request.POST.get('t3', False)
+            priority = request.POST.get('t4', False)
             
-        file_path = os.path.join(upload_dir, f"{ticket}.{ext}")
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            
-        with open(file_path, "wb") as file:
-            file.write(photo)
-            
-        lat, long = get_exif_location(get_exif_data(file_path))
-        img, severity, cost = predictDamage(file_path)
-        
-        status = "Error in logging your complaint. Please try after sometime"   
-        db_connection = pymysql.connect(**DB_CONFIG)
-        with db_connection:
-            db_cursor = db_connection.cursor()
-            query = "INSERT INTO complaint (complaint_id, citizenname, description, category, latitude, longitude, complaint_date, municipality_name, priority, severity, cost, photo, assigned_to, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-            data = (ticket, uname, desc, category, lat, long, date.today(), municipality, priority, severity, cost, f"{ticket}.{ext}", "-", "Pending")
-            db_cursor.execute(query, data)
-            db_connection.commit()
-            
-        if db_cursor.rowcount == 1:
-            status = f'<div class="status-banner success slide-in"><h4>Complaint Registered</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p></div>'
-            
-            # Show cost only for Road Damage
-            if category == "Road Damage":
-                status = status.replace('</div>', f'<span class="badge info">Automatic Estimated Cost: {cost}</span></div>')
-
-            # Send Notification Email using helper
-            event_desc = f"Successfully registered and assigned to {municipality}."
-            if category == "Road Damage":
-                event_desc += f" Estimated cost: {cost}"
-            
-            _send_complaint_update_email(ticket, f"SmartCity: Complaint #{ticket} Registered", event_desc)
+            if 't5' not in request.FILES:
+                return render(request, 'UserScreen.html', {'data': '<div class="status-banner error">Please upload a photo.</div>'})
                 
-        context= {'data':status, 'img': img}
-        return render(request, 'UserScreen.html', context)
+            photo_file = request.FILES['t5']
+            photo = photo_file.read()
+            filename = photo_file.name
+            ext = filename.split(".")[-1]
+            
+            ticket = 1
+            con = pymysql.connect(**DB_CONFIG)
+            with con:
+                cur = con.cursor()
+                cur.execute("select max(complaint_id) from complaint")
+                row = cur.fetchone()
+                if row and row[0]:
+                    ticket = int(row[0]) + 1
+            
+            # Ensure directory exists (Ephemeral on Render!)
+            upload_dir = os.path.join('CityApp', 'static', 'photo')
+            if not os.path.exists(upload_dir):
+                os.makedirs(upload_dir)
+                
+            file_path = os.path.join(upload_dir, f"{ticket}.{ext}")
+            with open(file_path, "wb") as file:
+                file.write(photo)
+            
+            # AI & Metadata processing
+            try:
+                lat, long = get_exif_location(get_exif_data(file_path))
+            except:
+                lat, long = "0.0", "0.0"
+                
+            try:
+                img, severity, cost = predictDamage(file_path)
+            except Exception as e:
+                print(f"AI Processing Error: {e}")
+                img, severity, cost = "", "Low", "0"
+            
+            status = "Error in logging your complaint. Please try after sometime"   
+            db_connection = pymysql.connect(**DB_CONFIG)
+            with db_connection:
+                db_cursor = db_connection.cursor()
+                query = "INSERT INTO complaint (complaint_id, citizenname, description, category, latitude, longitude, complaint_date, municipality_name, priority, severity, cost, photo, assigned_to, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                data = (ticket, uname, desc, category, lat, long, date.today(), municipality, priority, severity, cost, f"{ticket}.{ext}", "-", "Pending")
+                db_cursor.execute(query, data)
+                db_connection.commit()
+                
+            if db_cursor.rowcount == 1:
+                status = f'<div class="status-banner success slide-in"><h4>Complaint Registered</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p></div>'
+                if category == "Road Damage":
+                    status = status.replace('</div>', f'<span class="badge info">Automatic Estimated Cost: {cost}</span></div>')
+                
+                # Async-ish email (ignore errors to prevent 500)
+                try:
+                    event_desc = f"Successfully registered and assigned to {municipality}."
+                    if category == "Road Damage":
+                        event_desc += f" Estimated cost: {cost}"
+                    _send_complaint_update_email(ticket, f"SmartCity: Complaint #{ticket} Registered", event_desc)
+                except:
+                    pass
+                    
+            context= {'data':status, 'img': img}
+            return render(request, 'UserScreen.html', context)
+            
+        except Exception as e:
+            print(f"CRITICAL ERROR in ReportComplaintAction: {e}")
+            import traceback
+            traceback.print_exc()
+            return render(request, 'UserScreen.html', {'data': f'<div class="status-banner error">Something went wrong: {str(e)}</div>'})
 
 def ReportComplaint(request):
     if request.method == 'GET':
