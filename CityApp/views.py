@@ -1,5 +1,3 @@
-import matplotlib
-matplotlib.use('Agg')
 from django.shortcuts import render, redirect
 from django.template import RequestContext
 from django.contrib import messages
@@ -18,11 +16,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Global session variables replaced by Django session framework
-# request.session['uname'] -> Citizen/Admin username
-# request.session['mname'] -> Municipality name
-# request.session['oname'] -> Officer username
-
+# DB Configuration extracted from Environment Variables
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', '127.0.0.1'),
     'port': int(os.getenv('DB_PORT', 3306)),
@@ -35,21 +29,8 @@ DB_CONFIG = {
 
 CONFIDENCE_THRESHOLD = 0.35
 GREEN = (0, 255, 0)
-# Deferred model loading to prevent startup hangs on limited hardware (like Render free tier)
 _yolo8_model = None
-def get_yolo_model():
-    global _yolo8_model
-    if _yolo8_model is None:
-        try:
-            import torch  # Lazy import
-            torch.set_num_threads(1)  # Critical for slow CPUs to prevent thrashing
-            from ultralytics import YOLO  # Lazy import
-            _yolo8_model = YOLO("model/yolo8_best.pt")
-        except Exception as e:
-            print(f"Error loading YOLO model: {e}")
-    return _yolo8_model
 
-# Helper function to send email notifications for complaint lifecycle events
 def _send_complaint_update_email(complaint_id, subject, event_description):
     try:
         con = pymysql.connect(**DB_CONFIG)
@@ -70,20 +51,36 @@ def _send_complaint_update_email(complaint_id, subject, event_description):
     except Exception as e:
         print(f"Email Helper Error: {e}")
 
+# Optimized model loader for limited RAM (Render Free Tier)
+def get_yolo_model():
+    global _yolo8_model
+    if _yolo8_model is None:
+        try:
+            import torch  # Lazy import
+            # Limit parallelism to prevent OOM/CPU thrashing on shared hosting
+            torch.set_num_threads(1)
+            torch.set_num_interop_threads(1)
+            from ultralytics import YOLO  # Lazy import
+            _yolo8_model = YOLO("model/yolo8_best.pt")
+        except Exception as e:
+            print(f"Error loading YOLO model: {e}")
+    return _yolo8_model
+
 # function to read test image and then detect & predict road damage type
 def predictDamage(path):
     import cv2  # Lazy import
     import numpy as np  # Lazy import
+    import torch # For no_grad
     
     cost = 0
     frame = cv2.imread(path)
     if frame is None:
         return "", "Unknown", "0"
         
-    # Resize image to save RAM (Render Free Tier limit is 512MB)
-    # Most mobile photos are 3000px+, which can use 100MB+ of RAM
+    # Agresseive Resize for Render Free Tier (512MB RAM)
+    # Shrinking to 320px reduces memory usage by 4x compared to 640px
     h, w = frame.shape[:2]
-    max_dim = 640
+    max_dim = 320 
     if h > max_dim or w > max_dim:
         scale = max_dim / max(h, w)
         frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
@@ -92,9 +89,11 @@ def predictDamage(path):
     if model is None:
         return "", "Unknown", "0"
         
-    # Standardize image size for inference (480 is faster than 640)
-    # We use a lower imgsz and disable augmentation for speed
-    detections = model.predict(frame, imgsz=480, conf=CONFIDENCE_THRESHOLD, augment=False)[0]
+    # Standardize image size for inference (320 is FAST)
+    with torch.no_grad():
+        results = model.predict(frame, imgsz=320, conf=0.25, augment=False, verbose=False)
+    
+    detections = results[0]
     result = 0
     counter = 0
     
@@ -103,14 +102,14 @@ def predictDamage(path):
         if float(confidence) >= CONFIDENCE_THRESHOLD:
             xmin, ymin, xmax, ymax = int(data[0]), int(data[1]), int(data[2]), int(data[3])
             cv2.rectangle(frame, (xmin, ymin) , (xmax, ymax), GREEN, 2)
-            cv2.putText(frame, "Damage", (xmin, ymin),  cv2.FONT_HERSHEY_SIMPLEX,0.7, (255, 0, 0), 2)
+            cv2.putText(frame, "Damage", (xmin, ymin),  cv2.FONT_HERSHEY_SIMPLEX,0.5, (255, 0, 0), 1)
             result = 1
             counter += 1
             w_box = (xmax + ymax) / 2
             cost += w_box * 100
             
     if result == 0:
-        cv2.putText(frame, 'No Damage Detected', (50, 100),  cv2.FONT_HERSHEY_SIMPLEX,0.7, (255, 0, 0), 2)
+        cv2.putText(frame, 'No Damage Detected', (50, 50),  cv2.FONT_HERSHEY_SIMPLEX,0.5, (255, 0, 0), 1)
     
     severity = "High" if counter >= 3 else "Low"
     if cost == 0:
