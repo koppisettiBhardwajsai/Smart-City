@@ -6,13 +6,7 @@
 {% block extra_head %}
 <script language="Javascript">
 	function validate() {
-		var x = document.forms["f1"]["t3"].value;
-
-		if (x == null || x == "") {
-			window.alert("Work cost must be entered");
-			document.f1.t3.focus();
-			return false;
-		}
+		// Form inputs t1 (Complaint ID) and t2 (Field Officer) are dropdowns and always have a value selected
 		return true;
 	}
 </script>
