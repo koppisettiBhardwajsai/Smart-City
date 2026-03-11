@@ -41,6 +41,8 @@ def get_yolo_model():
     global _yolo8_model
     if _yolo8_model is None:
         try:
+            import torch  # Lazy import
+            torch.set_num_threads(1)  # Critical for slow CPUs to prevent thrashing
             from ultralytics import YOLO  # Lazy import
             _yolo8_model = YOLO("model/yolo8_best.pt")
         except Exception as e:
@@ -90,7 +92,9 @@ def predictDamage(path):
     if model is None:
         return "", "Unknown", "0"
         
-    detections = model(frame)[0]
+    # Standardize image size for inference (480 is faster than 640)
+    # We use a lower imgsz and disable augmentation for speed
+    detections = model.predict(frame, imgsz=480, conf=CONFIDENCE_THRESHOLD, augment=False)[0]
     result = 0
     counter = 0
     
