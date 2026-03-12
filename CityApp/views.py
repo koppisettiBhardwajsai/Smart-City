@@ -240,7 +240,7 @@ def AssignedToAction(request):
                 pass
             
         # Re-fetch the dropdowns so the assigned complaint disappears
-        output = '<tr><td><label>Complaint ID</label></td><td><select name="t1">'
+        output = '<tr><td><label for="complaint_id">Complaint ID</label></td><td><select name="t1" id="complaint_id">'
         with db_connection:
             cur = db_connection.cursor()
             cur.execute("select complaint_id from complaint where municipality_name='"+mname+"' and assigned_to='-'")
@@ -249,7 +249,7 @@ def AssignedToAction(request):
                 output += '<option value="'+str(row[0])+'">'+str(row[0])+'</option>'
         output += "</select></td></tr>"
         
-        output += '<tr><td><label>Field Officer</label></td><td><select name="t2">'
+        output += '<tr><td><label for="officer_id">Field Officer</label></td><td><select name="t2" id="officer_id">'
         with db_connection:
             cur = db_connection.cursor()
             cur.execute("select username from fieldofficer where municipality_name='"+mname+"'")
@@ -266,7 +266,7 @@ def AssignedTo(request):
         mname = request.session.get('mname')
         if mname is None:
             return render(request, 'MunicipalityLogin.html', {'data': 'Please login first'})
-        output = '<tr><td><label>Complaint ID</label></td><td><select name="t1">'
+        output = '<tr><td><label for="complaint_id">Complaint ID</label></td><td><select name="t1" id="complaint_id">'
         tid = request.GET.get('tid', '')
         con = pymysql.connect(**DB_CONFIG)
         with con:
@@ -278,7 +278,7 @@ def AssignedTo(request):
                 output += '<option value="'+str(row[0])+'" '+selected+'>'+str(row[0])+'</option>'
         output += "</select></td></tr>"
         
-        output += '<tr><td><label>Field Officer</label></td><td><select name="t2">'
+        output += '<tr><td><label for="officer_id">Field Officer</label></td><td><select name="t2" id="officer_id">'
         con = pymysql.connect(**DB_CONFIG)
         with con:
             cur = con.cursor()
