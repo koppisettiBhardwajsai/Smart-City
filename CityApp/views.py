@@ -312,7 +312,10 @@ def ComplaintRequest(request):
                 output += f'<td>{row[8]}</td><td>{row[9]}</td><td>{row[10]}</td>'
                 output += f'<td><img src="/media/photo/{row[11]}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"/></td>'
                 output += f'<td><span class="badge warning">{row[13]}</span></td>'
-                output += f'<td><a href="AssignedTo?tid={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Assign Officer</a></td></tr>'
+                if row[12] == '-':
+                    output += f'<td><a href="AssignedTo?tid={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Assign Officer</a></td></tr>'
+                else:
+                    output += f'<td><span class="badge info" style="display:inline-block; padding:8px; line-height:1.2;">Assigned:<br/><b>{row[12]}</b></span></td></tr>'
         output += "</tbody></table></div>"
         context= {'data':output}
         return render(request, 'MunicipalityScreen.html', context)
