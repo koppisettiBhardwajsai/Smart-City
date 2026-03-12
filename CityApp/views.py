@@ -181,7 +181,10 @@ def UpdateStatus(request):
         status = "Closed"
         
         # Send Notification Email using helper
-        _send_complaint_update_email(tid, f"SmartCity: Complaint #{tid} Resolved", f"The issue has been successfully resolved/closed.")
+        try:
+            _send_complaint_update_email(tid, f"SmartCity: Complaint #{tid} Resolved", f"The issue has been successfully resolved/closed.")
+        except:
+            pass
 
         db_connection = pymysql.connect(**DB_CONFIG)
         db_cursor = db_connection.cursor()
