@@ -46,22 +46,31 @@ def _send_complaint_update_email(complaint_id, subject, event_description):
                 if email_row and email_row[0]:
                     recipient_email = email_row[0]
                     message = f"Dear {citizen_name},\n\nYour complaint #{complaint_id} has been updated.\n\nDescription: {desc}\n\nUpdate: {event_description}\n\nRegards,\nSmartCity Team"
-                    send_mail(subject, message, settings.EMAIL_HOST_USER, [recipient_email], fail_silently=True)
+                    send_mail(subject, message, settings.EMAIL_HOST_USER, [recipient_email], fail_silently=False)
                     print(f"Email sent to {recipient_email} for complaint #{complaint_id}")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Email Helper Error: {e}")
 
 # Optimized model loader for limited RAM (Render Free Tier)
 def get_yolo_model():
     global _yolo8_model
     if _yolo8_model is None:
+        model_path = os.path.join(settings.BASE_DIR, "model", "yolo8_best.pt")
+        print(f"DEBUG: Checking for model at {model_path}")
+        if not os.path.exists(model_path):
+            print(f"ERROR: Model file NOT FOUND at {model_path}")
+            return None
+            
         try:
             import torch  # Lazy import
             # Limit parallelism to prevent OOM/CPU thrashing on shared hosting
             torch.set_num_threads(1)
             torch.set_num_interop_threads(1)
             from ultralytics import YOLO  # Lazy import
-            _yolo8_model = YOLO("model/yolo8_best.pt")
+            _yolo8_model = YOLO(model_path)
+            print("DEBUG: YOLO model loaded successfully")
         except Exception as e:
             print(f"Error loading YOLO model: {e}")
     return _yolo8_model
@@ -113,7 +122,7 @@ def predictDamage(path):
     
     severity = "High" if counter >= 3 else "Low"
     if cost == 0:
-        cost = 100000
+        cost = 500  # Reasonable base inspection cost if no specific damage detected
         
     # More memory-efficient encoding than plt.savefig
     _, buffer = cv2.imencode('.png', frame)
@@ -505,9 +514,9 @@ def ReportComplaintAction(request):
 
             # 3. Notification & Response
             status = f'<div class="status-banner success slide-in"><h4>Complaint Registered</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p></div>'
-            if success and category == "Road Damage":
-                status = status.replace('</div>', f'<span class="badge info">Automatic Estimated Cost: {cost}</span></div>')
-            elif not success:
+            if success:
+                status = status.replace('</div>', f'<span class="badge info">Automatic Estimated Cost: ₹{cost}</span></div>')
+            else:
                 status = status.replace('Registered', 'Registered (Pending AI Analysis)')
             
             # Async email notification
