@@ -514,9 +514,9 @@ def ReportComplaintAction(request):
 
             # 3. Notification & Response
             status = f'<div class="status-banner success slide-in"><h4>Complaint Registered</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p></div>'
-            if success:
+            if success and category == "Road Damage":
                 status = status.replace('</div>', f'<span class="badge info">Automatic Estimated Cost: ₹{cost}</span></div>')
-            else:
+            elif not success:
                 status = status.replace('Registered', 'Registered (Pending AI Analysis)')
             
             # Async email notification
