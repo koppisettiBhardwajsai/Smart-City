@@ -1,13 +1,13 @@
 Django>=4.2.5
 pymysql
 exifread
-opencv-python-headless
-ultralytics
-numpy
+opencv-python-headless==4.8.0.74
+ultralytics==8.4.30
+numpy<2.0.0
 gunicorn
 whitenoise
 python-dotenv
 dj-database-url
-torch
-torchvision
+torch --index-url https://download.pytorch.org/whl/cpu
+torchvision --index-url https://download.pytorch.org/whl/cpu
 cryptography

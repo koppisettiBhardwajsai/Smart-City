@@ -12,6 +12,7 @@ import traceback
 import cv2
 import torch
 from ultralytics import YOLO
+import gc
 
 load_dotenv()
 
@@ -159,7 +160,9 @@ def predictDamage(path):
 
     # Explicit cleanup
     del frame
-    del buffer
+    if 'buffer' in locals():
+        del buffer
+    gc.collect()
 
     return img_b64, severity, str(int(cost))
 
@@ -626,7 +629,12 @@ def ReportComplaintAction(request):
 
                 success = True
             except Exception as e:
-                print(f"CRITICAL AI FAILURE (OOM/Timeout/DB): {e}")
+                error_msg = str(e)
+                print(f"CRITICAL AI FAILURE (OOM/Timeout/DB): {error_msg}")
+                traceback.print_exc()
+                
+                # Log detailed error for debugging if needed
+                # status = status.replace('Registered', f'Registered (AI Error: {error_msg[:30]}...)')
 
             # 3. Notification & Response
             status = f'<div class="status-banner success slide-in"><h4>Complaint Registered</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p></div>'
