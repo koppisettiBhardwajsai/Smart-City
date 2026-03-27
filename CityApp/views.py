@@ -245,11 +245,13 @@ def UpdateStatus(request):
 
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
+                cur = db_connection.cursor()
+                try:
                     sql = "UPDATE complaint SET status=%s WHERE complaint_id=%s"
                     cur.execute(sql, (status, tid))
                     db_connection.commit()
+                finally:
+                    cur.close()
                 
                 output = f'<div class="status-banner success slide-in">Complaint status successfully updated to: <strong>{status}</strong></div>'
                 return render(request, 'OfficerScreen.html', {'data': output})
@@ -277,16 +279,23 @@ def ViewTask(request):
         output += '<th>Priority</th><th>Severity</th><th>Cost</th><th>Evidence</th>'
         output += '<th>Status</th><th>Action</th></tr></thead><tbody>'
         con = pymysql.connect(**DB_CONFIG)
-        with con:
+        try:
             cur = con.cursor()
-            cur.execute("select * from complaint where assigned_to='" +
-                        oname + "' and status='Pending'")
-            rows = cur.fetchall()
+            try:
+                cur.execute("SELECT * FROM complaint WHERE assigned_to=%s AND status='Pending'", (oname,))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+        finally:
+            con.close()
             for row in rows:
                 output += f'<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td>'
                 output += f'<td><small>{row[4]},<br/>{row[5]}</small></td><td>{row[6]}</td><td>{row[7]}</td>'
                 output += f'<td>{row[8]}</td><td>{row[9]}</td><td>{row[10]}</td>'
-                output += f'<td><img src="/media/photo/{row[11]}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;box-shadow:var(--shadow-sm);"/></td>'
+                # Image with fallback
+                output += f'<td><div style="width:80px;height:80px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden;border:1px solid #edf2f7;">'
+                output += f'<img src="/media/photo/{row[11]}" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';" style="width:100%;height:100%;object-fit:cover;"/>'
+                output += f'<div style="display:none;flex-direction:column;align-items:center;color:#a0aec0;font-size:10px;"><i class="fas fa-image" style="font-size:20px;margin-bottom:4px;"></i><span>N/A</span></div></div></td>'
                 output += f'<td><span class="badge info">{row[13]}</span></td>'
                 output += f'<td><a href="UpdateStatus?tid={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Mark Closed</a></td></tr>'
         output += "</tbody></table></div>"
@@ -314,19 +323,15 @@ def AssignedToAction(request):
 
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
-                    # Use parameterized query for safety and to avoid TypeErrors
+                cur = db_connection.cursor()
+                try:
                     sql = "UPDATE complaint SET assigned_to=%s WHERE complaint_id=%s"
                     cur.execute(sql, (emp, complaint))
                     db_connection.commit()
                     
                     row_count = cur.rowcount
-                    print(f"{row_count} Record Updated")
-                    
                     if row_count == 1:
                         status = f'<div class="status-banner success slide-in">Work successfully assigned to: <strong>{emp}</strong></div>'
-                        # Send Notification Email
                         try:
                             _send_complaint_update_email(
                                 complaint,
@@ -354,6 +359,8 @@ def AssignedToAction(request):
 
                     context = {'data': status, 'data1': output}
                     return render(request, 'AssignedTo.html', context)
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
 
@@ -374,33 +381,27 @@ def AssignedTo(request):
                     'data': 'Please login first'})
         output = '<tr><td><label for="complaint_id">Complaint ID</label></td><td><select name="t1" id="complaint_id">'
         tid = request.GET.get('tid', '')
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "select complaint_id from complaint where municipality_name='" +
-                mname +
-                "' and assigned_to='-'")
-            rows = cur.fetchall()
-            for row in rows:
-                selected = "selected" if str(row[0]) == str(tid) else ""
-                output += '<option value="' + \
-                    str(row[0]) + '" ' + selected + '>' + str(row[0]) + '</option>'
-        output += "</select></td></tr>"
+        db_connection = pymysql.connect(**DB_CONFIG)
+        try:
+            cur = db_connection.cursor()
+            try:
+                cur.execute("SELECT complaint_id FROM complaint WHERE municipality_name=%s AND assigned_to='-'", (mname,))
+                rows = cur.fetchall()
+                for row in rows:
+                    selected = "selected" if str(row[0]) == str(tid) else ""
+                    output += f'<option value="{row[0]}" {selected}>{row[0]}</option>'
+                output += "</select></td></tr>"
 
-        output += '<tr><td><label for="officer_id">Field Officer</label></td><td><select name="t2" id="officer_id">'
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "select username from fieldofficer where municipality_name='" +
-                mname +
-                "'")
-            rows = cur.fetchall()
-            for row in rows:
-                output += '<option value="' + \
-                    row[0] + '">' + row[0] + '</option>'
-        output += "</select></td></tr>"
+                output += '<tr><td><label for="officer_id">Field Officer</label></td><td><select name="t2" id="officer_id">'
+                cur.execute("SELECT username FROM fieldofficer WHERE municipality_name=%s", (mname,))
+                rows = cur.fetchall()
+                for row in rows:
+                    output += f'<option value="{row[0]}">{row[0]}</option>'
+                output += "</select></td></tr>"
+            finally:
+                cur.close()
+        finally:
+            db_connection.close()
 
         context = {'data1': output}
         return render(request, 'AssignedTo.html', context)
@@ -419,11 +420,15 @@ def ComplaintRequest(request):
         output += '<th>Priority</th><th>Severity</th><th>Cost</th><th>Evidence</th>'
         output += '<th>Status</th><th>Action</th></tr></thead><tbody>'
         con = pymysql.connect(**DB_CONFIG)
-        with con:
+        try:
             cur = con.cursor()
-            cur.execute("select * from complaint where municipality_name='" +
-                        mname + "' and status='Pending'")
-            rows = cur.fetchall()
+            try:
+                cur.execute("SELECT * FROM complaint WHERE municipality_name=%s AND status='Pending'", (mname,))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+        finally:
+            con.close()
             for row in rows:
                 output += f'<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td>'
                 output += f'<td><small>{row[4]},<br/>{row[5]}</small></td><td>{row[6]}</td><td>{row[7]}</td>'
@@ -510,22 +515,23 @@ def DeleteComplaint(request):
             return render(request, 'UserScreen.html', context)
 
         # Verify ownership and get photo filename
-        con = pymysql.connect(**DB_CONFIG)
+        db_connection = pymysql.connect(**DB_CONFIG)
         photo_filename = ""
         is_owner = False
 
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "select citizenname, photo from complaint where complaint_id='" +
-                cid +
-                "'")
-            rows = cur.fetchall()
-            for row in rows:
-                if row[0] == uname or uname == 'admin':
-                    is_owner = True
-                    photo_filename = str(row[1])
-                    break
+        try:
+            cur = db_connection.cursor()
+            try:
+                cur.execute("SELECT citizenname, photo FROM complaint WHERE complaint_id=%s", (cid,))
+                row = cur.fetchone()
+                if row:
+                    if row[0] == uname or uname == 'admin':
+                        is_owner = True
+                        photo_filename = str(row[1])
+            finally:
+                cur.close()
+        finally:
+            db_connection.close()
 
         if not is_owner:
             status = '<div class="status-banner error slide-in">You can only delete your own complaints.</div>'
@@ -546,12 +552,18 @@ def DeleteComplaint(request):
 
         # Delete from database
         db_connection = pymysql.connect(**DB_CONFIG)
-        db_cursor = db_connection.cursor()
-        delete_query = "DELETE FROM complaint WHERE complaint_id='" + cid + "';"
-        db_cursor.execute(delete_query)
-        db_connection.commit()
+        try:
+            cur = db_connection.cursor()
+            try:
+                cur.execute("DELETE FROM complaint WHERE complaint_id=%s", (cid,))
+                db_connection.commit()
+                row_count = cur.rowcount
+            finally:
+                cur.close()
+        finally:
+            db_connection.close()
 
-        if db_cursor.rowcount == 1:
+        if row_count == 1:
             # Send Notification Email using helper BEFORE deletion logic is fully gone or use cached info
             # In this app, we already have the info from the 'is_owner' check
             # loop
@@ -595,13 +607,18 @@ def ReportComplaintAction(request):
             ext = filename.split(".")[-1]
 
             ticket = 1
-            con = pymysql.connect(**DB_CONFIG)
-            with con:
-                cur = con.cursor()
-                cur.execute("select max(complaint_id) from complaint")
-                row = cur.fetchone()
-                if row and row[0]:
-                    ticket = int(row[0]) + 1
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                cur = db_connection.cursor()
+                try:
+                    cur.execute("SELECT MAX(complaint_id) FROM complaint")
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        ticket = int(row[0]) + 1
+                finally:
+                    cur.close()
+            finally:
+                db_connection.close()
 
             # Ensure directory exists (Ephemeral on Render!)
             # Use Media directory for user uploads
@@ -625,27 +642,32 @@ def ReportComplaintAction(request):
             except Exception:
                 pass
 
-            con_save = pymysql.connect(**DB_CONFIG)
-            with con_save:
-                cur_save = con_save.cursor()
-                query = "INSERT INTO complaint (complaint_id, citizenname, description, category, latitude, longitude, complaint_date, municipality_name, priority, severity, cost, photo, assigned_to, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                data = (
-                    ticket,
-                    uname,
-                    desc,
-                    category,
-                    lat,
-                    long,
-                    date.today(),
-                    municipality,
-                    priority,
-                    severity,
-                    cost,
-                    f"{ticket}.{ext}",
-                    "-",
-                    "Pending")
-                cur_save.execute(query, data)
-                con_save.commit()
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                cur = db_connection.cursor()
+                try:
+                    query = "INSERT INTO complaint (complaint_id, citizenname, description, category, latitude, longitude, complaint_date, municipality_name, priority, severity, cost, photo, assigned_to, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                    data = (
+                        ticket,
+                        uname,
+                        desc,
+                        category,
+                        lat,
+                        long,
+                        date.today(),
+                        municipality,
+                        priority,
+                        severity,
+                        cost,
+                        f"{ticket}.{ext}",
+                        "-",
+                        "Pending")
+                    cur.execute(query, data)
+                    db_connection.commit()
+                finally:
+                    cur.close()
+            finally:
+                db_connection.close()
 
             # 2. Attempt AI Processing SECOND
             success = False
@@ -657,13 +679,17 @@ def ReportComplaintAction(request):
                     success = True
                     # Update the database with AI results
                     try:
-                        con_update = pymysql.connect(**DB_CONFIG)
-                        with con_update:
-                            cur_update = con_update.cursor()
-                            query_update = "UPDATE complaint SET severity=%s, cost=%s WHERE complaint_id=%s"
-                            cur_update.execute(query_update, (severity, cost, ticket))
-                            con_update.commit()
-                        con_update.close()
+                        db_connection = pymysql.connect(**DB_CONFIG)
+                        try:
+                            cur = db_connection.cursor()
+                            try:
+                                query_update = "UPDATE complaint SET severity=%s, cost=%s WHERE complaint_id=%s"
+                                cur.execute(query_update, (severity, cost, ticket))
+                                db_connection.commit()
+                            finally:
+                                cur.close()
+                        finally:
+                            db_connection.close()
                     except Exception as db_e:
                         print(f"Database update failed after AI success: {db_e}")
             except Exception as e:
@@ -731,17 +757,18 @@ def ReportComplaint(request):
 
 def getCount(category):
     count = 0
-    con = pymysql.connect(**DB_CONFIG)
-    with con:
-        cur = con.cursor()
-        cur.execute(
-            "select count(category) from complaint where category='" +
-            category +
-            "'")
-        rows = cur.fetchall()
-        for row in rows:
-            count = row[0]
-            break
+    db_connection = pymysql.connect(**DB_CONFIG)
+    try:
+        cur = db_connection.cursor()
+        try:
+            cur.execute("SELECT COUNT(category) FROM complaint WHERE category=%s", (category,))
+            row = cur.fetchone()
+            if row:
+                count = row[0]
+        finally:
+            cur.close()
+    finally:
+        db_connection.close()
     return count
 
 
@@ -759,15 +786,18 @@ def Graph(request):
         total_cost_calc = 0
         complaints_list = []
 
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-
-            # Fetch all complaints for aggregation and filtering
-            cur.execute(
-                "select category, status, severity, municipality_name, cost, description, complaint_date, priority, complaint_id from complaint")
-            rows = cur.fetchall()
-            total_complaints = len(rows)
+        db_connection = pymysql.connect(**DB_CONFIG)
+        try:
+            cur = db_connection.cursor()
+            try:
+                # Fetch all complaints for aggregation and filtering
+                cur.execute("SELECT category, status, severity, municipality_name, cost, description, complaint_date, priority, complaint_id FROM complaint")
+                rows = cur.fetchall()
+                total_complaints = len(rows)
+            finally:
+                cur.close()
+        finally:
+            db_connection.close()
 
             for row in rows:
                 cat, status, sev, muni, cost, desc, cdate, priority, cid = row
@@ -857,9 +887,8 @@ def AddOfficerAction(request):
 
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
-                    # Parameterized INSERT
+                cur = db_connection.cursor()
+                try:
                     sql = "INSERT INTO fieldofficer (username, password, contact_no, municipality_name) VALUES (%s, %s, %s, %s)"
                     cur.execute(sql, (username, password, contact, mname))
                     db_connection.commit()
@@ -870,6 +899,8 @@ def AddOfficerAction(request):
                         status = '<div class="status-banner error">Failed to register officer.</div>'
                     
                     return render(request, 'MunicipalityScreen.html', {'data': status})
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
         except Exception as e:
@@ -894,11 +925,15 @@ def ViewOfficer(request):
         output = '<div class="table-container fade-in"><table class="data-table"><thead><tr>'
         output += '<th>Username</th><th>Contact No</th><th>Municipality</th><th>Actions</th></tr></thead><tbody>'
         con = pymysql.connect(**DB_CONFIG)
-        with con:
+        try:
             cur = con.cursor()
-            cur.execute(
-                f"select * from fieldofficer where municipality_name='{mname}'")
-            rows = cur.fetchall()
+            try:
+                cur.execute("SELECT * FROM fieldofficer WHERE municipality_name=%s", (mname,))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+        finally:
+            con.close()
             for row in rows:
                 output += f'<tr><td>{row[0]}</td><td>{row[2]}</td><td>{row[3]}</td>'
                 output += f'<td><a href="UpdateOfficer?user={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; margin-right:20px; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-edit"></i></a>'
@@ -935,11 +970,12 @@ def DeleteOfficer(request):
 
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
-                    # Parameterized DELETE
+                cur = db_connection.cursor()
+                try:
                     cur.execute("DELETE FROM fieldofficer WHERE username=%s", (username,))
                     db_connection.commit()
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
             return redirect('ViewOfficer')
@@ -951,13 +987,17 @@ def DeleteOfficer(request):
 def UpdateOfficer(request):
     if request.method == 'GET':
         username = request.GET.get('user', False)
-        con = pymysql.connect(**DB_CONFIG)
+        db_connection = pymysql.connect(**DB_CONFIG)
         data = None
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "select * from fieldofficer where username='" + username + "'")
-            data = cur.fetchone()
+        try:
+            cur = db_connection.cursor()
+            try:
+                cur.execute("SELECT * FROM fieldofficer WHERE username=%s", (username,))
+                data = cur.fetchone()
+            finally:
+                cur.close()
+        finally:
+            db_connection.close()
         return render(request, 'UpdateOfficer.html', {'data': data})
 
 
@@ -1088,11 +1128,13 @@ def UpdateCitizenAction(request):
 
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
+                cur = db_connection.cursor()
+                try:
                     sql = "UPDATE signup SET password=%s, contact_no=%s, email_id=%s, address=%s WHERE username=%s"
                     cur.execute(sql, (password, contact, email, address, username))
                     db_connection.commit()
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
             return redirect('ViewCitizens')
@@ -1100,32 +1142,6 @@ def UpdateCitizenAction(request):
             print(f"ERROR in UpdateCitizenAction: {e}")
             return redirect('ViewCitizens')
 
-        # Return to citizen list with success message
-        status = '<div class="status-banner success slide-in">Citizen details updated successfully.</div>'
-        output = status + '<div class="table-container fade-in"><table class="data-table"><thead><tr>'
-        output += '<th>Citizen Name</th><th>Contact No</th><th>Email ID</th><th>Address</th><th>Actions</th></tr></thead><tbody>'
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute("select * from signup")
-            rows = cur.fetchall()
-            for row in rows:
-                output += f'<tr><td>{row[0]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td>'
-                output += f'<td><a href="UpdateCitizen?user={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; margin-right:10px; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-edit"></i></a>'
-                output += f'<a href="javascript:void(0);" onclick="confirmDeleteCitizen(\'{row[0]}\')" style="display:inline-block; background:linear-gradient(135deg, #ef476f 0%, #d63654 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-trash"></i></a></td></tr>'
-        output += "</tbody></table></div>"
-
-        # Add JavaScript for delete confirmation
-        output += """
-        <script>
-        function confirmDeleteCitizen(username) {
-            if (confirm('Are you sure you want to delete this citizen? All associated records will be affected.')) {
-                window.location.href = 'DeleteCitizen?user=' + username;
-            }
-        }
-        </script>
-        """
-        return render(request, 'AdminScreen.html', {'data': output})
 
 
 def ViewUserComplaint(request):
@@ -1182,17 +1198,20 @@ def ViewMunicipality(request):
                     'data': 'Please login first'})
         output = '<div class="table-container fade-in"><table class="data-table"><thead><tr>'
         output += '<th>Name</th><th>Employee</th><th>Contact No</th><th>Email ID</th><th>Address</th><th>Actions</th></tr></thead><tbody>'
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            # Adjusted query based on new headers
-            cur.execute(
-                "select municipality_name, employee_name, municipality_contact_no, employee_contact_no, city_name from municipality")
-            rows = cur.fetchall()
-            for row in rows:
-                output += f'<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td>'
-                output += f'<td><a href="UpdateMunicipality?mname={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; margin-right:10px; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-edit"></i></a>'
-                output += f'<a href="javascript:void(0);" onclick="confirmDeleteMunicipality(\'{row[0]}\')" style="display:inline-block; background:linear-gradient(135deg, #ef476f 0%, #d63654 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-trash"></i></a></td></tr>'
+        db_connection = pymysql.connect(**DB_CONFIG)
+        try:
+            cur = db_connection.cursor()
+            try:
+                cur.execute("SELECT municipality_name, employee_name, municipality_contact_no, employee_contact_no, city_name FROM municipality")
+                rows = cur.fetchall()
+                for row in rows:
+                    output += f'<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td>'
+                    output += f'<td><a href="UpdateMunicipality?mname={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; margin-right:10px; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-edit"></i></a>'
+                    output += f'<a href="javascript:void(0);" onclick="confirmDeleteMunicipality(\'{row[0]}\')" style="display:inline-block; background:linear-gradient(135deg, #ef476f 0%, #d63654 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-trash"></i></a></td></tr>'
+            finally:
+                cur.close()
+        finally:
+            db_connection.close()
         output += "</tbody></table></div>"
 
         # Add JavaScript for delete confirmation
@@ -1262,8 +1281,8 @@ def AddMunicipalityAction(request):
 
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
+                cur = db_connection.cursor()
+                try:
                     cur.execute("SELECT username FROM municipality WHERE username = %s", (user,))
                     if cur.fetchone():
                         status = 'Given Username already exists'
@@ -1272,7 +1291,9 @@ def AddMunicipalityAction(request):
                         cur.execute(sql, (municipality, city, ename, dept_contact, emp_contact, user, password, desc))
                         db_connection.commit()
                         status = '<div class="status-banner success slide-in">Municipality department successfully established.</div>'
-                return render(request, 'AddMunicipality.html', {'data': status})
+                    return render(request, 'AddMunicipality.html', {'data': status})
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
         except Exception as e:
@@ -1290,15 +1311,17 @@ def UpdateMunicipality(request):
                 request, 'AdminLogin.html', {
                     'data': 'Please login first'})
         mname = request.GET.get('mname', False)
-        con = pymysql.connect(**DB_CONFIG)
+        db_connection = pymysql.connect(**DB_CONFIG)
         data = None
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "select * from municipality where municipality_name='" +
-                mname +
-                "'")
-            data = cur.fetchone()
+        try:
+            cur = db_connection.cursor()
+            try:
+                cur.execute("SELECT * FROM municipality WHERE municipality_name=%s", (mname,))
+                data = cur.fetchone()
+            finally:
+                cur.close()
+        finally:
+            db_connection.close()
         return render(request, 'UpdateMunicipality.html', {'data': data})
 
 
@@ -1321,46 +1344,19 @@ def UpdateMunicipalityAction(request):
 
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
+                cur = db_connection.cursor()
+                try:
                     sql = "UPDATE municipality SET city_name=%s, employee_name=%s, municipality_contact_no=%s, employee_contact_no=%s, password=%s, municipality_desc=%s WHERE municipality_name=%s"
                     cur.execute(sql, (city, ename, dept_contact, emp_contact, password, desc, mname))
                     db_connection.commit()
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
             return redirect('ViewMunicipality')
         except Exception as e:
             print(f"ERROR in UpdateMunicipalityAction: {e}")
             return redirect('ViewMunicipality')
-
-        # Generate view with success message
-        status = '<div class="status-banner success slide-in">Municipality details updated successfully.</div>'
-        status += '<div class="table-container fade-in"><table class="data-table"><thead><tr>'
-        status += '<th>Municipality</th><th>City</th><th>Employee</th><th>Dept Contact</th>'
-        status += '<th>Emp Contact</th><th>Username</th><th>Description</th><th>Actions</th></tr></thead><tbody>'
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute("select * from municipality")
-            rows = cur.fetchall()
-            for row in rows:
-                status += f'<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td>'
-                status += f'<td>{row[4]}</td><td>{row[5]}</td><td>{row[7]}</td>'
-                status += f'<td><a href="UpdateMunicipality?mname={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; margin-right:20px; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-edit"></i></a>'
-                status += f'<a href="javascript:void(0);" onclick="confirmDeleteMunicipality(\'{row[0]}\')" style="display:inline-block; background:linear-gradient(135deg, #ef476f 0%, #d63654 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-trash"></i></a></td></tr>'
-        status += "</tbody></table></div>"
-
-        # Add JavaScript for delete confirmation
-        status += """
-        <script>
-        function confirmDeleteMunicipality(mname) {
-            if (confirm('Are you sure you want to delete this municipality? All associated officers will also be affected.')) {
-                window.location.href = 'DeleteMunicipality?mname=' + mname;
-            }
-        }
-        </script>
-        """
-        return render(request, 'AdminScreen.html', {'data': status})
 
     return ViewMunicipality(request)
 
@@ -1378,9 +1374,8 @@ def OfficerLoginAction(request):
             
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
-                    # Secure parameterized query
+                cur = db_connection.cursor()
+                try:
                     cur.execute("SELECT username, municipality_name FROM fieldofficer WHERE username=%s AND password=%s", (username, password))
                     row = cur.fetchone()
                     if row:
@@ -1388,6 +1383,8 @@ def OfficerLoginAction(request):
                         return render(request, 'OfficerScreen.html', {'data': f'welcome {username}'})
                     else:
                         return render(request, 'OfficerLogin.html', {'data': 'Invalid login details'})
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
         except Exception as e:
@@ -1403,9 +1400,8 @@ def MunicipalityLoginAction(request):
             
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
-                    # Secure parameterized query
+                cur = db_connection.cursor()
+                try:
                     cur.execute("SELECT username, municipality_name FROM municipality WHERE username=%s AND password=%s", (username, password))
                     row = cur.fetchone()
                     if row:
@@ -1413,6 +1409,8 @@ def MunicipalityLoginAction(request):
                         return render(request, 'MunicipalityScreen.html', {'data': f'welcome {username}'})
                     else:
                         return render(request, 'MunicipalityLogin.html', {'data': 'Invalid login details'})
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
         except Exception as e:
@@ -1481,8 +1479,8 @@ def RegisterAction(request):
 
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
+                cur = db_connection.cursor()
+                try:
                     # Check if username/email already exists
                     cur.execute("SELECT username FROM signup WHERE username = %s OR email_id = %s", (username, email))
                     if cur.fetchone():
@@ -1495,7 +1493,9 @@ def RegisterAction(request):
                             status = '<div class="status-banner success slide-in">Account created successfully! You can now login for city services.</div>'
                         else:
                             status = '<div class="status-banner error">Failed to create account.</div>'
-                return render(request, 'Register.html', {'data': status})
+                    return render(request, 'Register.html', {'data': status})
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
         except Exception as e:
@@ -1511,9 +1511,8 @@ def UserLoginAction(request):
             
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
-                    # Secure parameterized query
+                cur = db_connection.cursor()
+                try:
                     cur.execute("SELECT username FROM signup WHERE username=%s AND password=%s", (username, password))
                     row = cur.fetchone()
                     if row:
@@ -1521,6 +1520,8 @@ def UserLoginAction(request):
                         return render(request, 'UserScreen.html', {'data': f'welcome {username}'})
                     else:
                         return render(request, 'UserLogin.html', {'data': 'Invalid login details'})
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
         except Exception as e:
@@ -1534,21 +1535,25 @@ def UpdateComplaint(request):
         description = ""
         category = ""
         priority = ""
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                f"select description, category, priority, status, photo from complaint where complaint_id='{cid}'")
-            row = cur.fetchone()
-            if row:
-                description = row[0]
-                category = row[1]
-                priority = row[2]
-                status = row[3]
-                photo = row[4]
-            else:
-                status = "Unknown"
-                photo = ""
+        db_connection = pymysql.connect(**DB_CONFIG)
+        try:
+            cur = db_connection.cursor()
+            try:
+                cur.execute("SELECT description, category, priority, status, photo FROM complaint WHERE complaint_id=%s", (cid,))
+                row = cur.fetchone()
+                if row:
+                    description = row[0]
+                    category = row[1]
+                    priority = row[2]
+                    status = row[3]
+                    photo = row[4]
+                else:
+                    status = "Unknown"
+                    photo = ""
+            finally:
+                cur.close()
+        finally:
+            db_connection.close()
         context = {
             'cid': cid,
             'description': description,
@@ -1579,11 +1584,13 @@ def UpdateComplaintAction(request):
 
             db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                with db_connection:
-                    cur = db_connection.cursor()
+                cur = db_connection.cursor()
+                try:
                     sql = "UPDATE complaint SET description=%s, category=%s, priority=%s, status=%s WHERE complaint_id=%s"
                     cur.execute(sql, (description, category, priority, status, cid))
                     db_connection.commit()
+                finally:
+                    cur.close()
             finally:
                 db_connection.close()
 
@@ -1600,45 +1607,6 @@ def UpdateComplaintAction(request):
         except Exception as e:
             print(f"ERROR in UpdateComplaintAction: {e}")
             return redirect('ViewUserComplaint')
-
-        # Regenerate ViewUserComplaint with success message
-        status_msg = f'<div class="status-banner success slide-in">Complaint #<strong>{cid}</strong> updated successfully.</div>'
-
-        output = status_msg + \
-            '<div class="table-container fade-in"><table class="data-table"><thead><tr>'
-        output += '<th>ID</th><th>Citizen</th><th>Description</th><th>Category</th>'
-        output += '<th>Location</th><th>Date</th><th>Municipality</th>'
-        output += '<th>Priority</th><th>Severity</th><th>Cost</th><th>Evidence</th>'
-        output += '<th>Officer</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute("select * from complaint")
-            rows = cur.fetchall()
-            for row in rows:
-                output += f'<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td>'
-                output += f'<td><small>{row[4]},<br/>{row[5]}</small></td><td>{row[6]}</td><td>{row[7]}</td>'
-                output += f'<td>{row[8]}</td><td>{row[9]}</td><td>{row[10]}</td>'
-                                # Image with fallback
-                output += f'<td><div style="width:80px;height:80px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden;border:1px solid #edf2f7;">'
-                output += f'<img src="/media/photo/{row[11]}" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';" style="width:100%;height:100%;object-fit:cover;"/>'
-                output += f'<div style="display:none;flex-direction:column;align-items:center;color:#a0aec0;font-size:10px;"><i class="fas fa-image" style="font-size:20px;margin-bottom:4px;"></i><span>N/A</span></div></div></td>'
-                output += f'<td>{row[12]}</td><td><span class="badge info">{row[13]}</span></td>'
-                output += f'<td><a href="UpdateComplaint?cid={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; margin-right:10px; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-edit"></i></a>'
-                output += f'<a href="javascript:void(0);" onclick="confirmDelete({row[0]})" style="display:inline-block; background:linear-gradient(135deg, #ef476f 0%, #d63654 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-trash"></i></a></td></tr>'
-        output += "</tbody></table></div>"
-
-        # Add JavaScript for delete confirmation
-        output += """
-        <script>
-        function confirmDelete(complaintId) {
-            if (confirm('Are you sure you want to delete this complaint? This action cannot be undone.')) {
-                window.location.href = 'DeleteComplaint?cid=' + complaintId;
-            }
-        }
-        </script>
-        """
-        return render(request, 'AdminScreen.html', {'data': output})
 
 
 def Broadcast(request):
@@ -1662,15 +1630,20 @@ def BroadcastAction(request):
         subject = request.POST.get('t1', False)
         message_body = request.POST.get('t2', False)
 
-        con = pymysql.connect(**DB_CONFIG)
+        db_connection = pymysql.connect(**DB_CONFIG)
         emails = []
-        with con:
-            cur = con.cursor()
-            cur.execute("select email_id from signup")
-            rows = cur.fetchall()
-            for row in rows:
-                if row[0]:
-                    emails.append(row[0])
+        try:
+            cur = db_connection.cursor()
+            try:
+                cur.execute("SELECT email_id FROM signup")
+                rows = cur.fetchall()
+                for row in rows:
+                    if row[0]:
+                        emails.append(row[0])
+            finally:
+                cur.close()
+        finally:
+            db_connection.close()
 
         if emails:
             full_message = f"OFFICIAL SMARTCITY BROADCAST\n===========================\n\n{message_body}\n\n---\nBroadcasted by Administrator on {date.today()}"
