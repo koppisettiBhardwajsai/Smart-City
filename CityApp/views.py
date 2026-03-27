@@ -219,33 +219,49 @@ def get_exif_data(image_file):
 
 def UpdateStatus(request):
     if request.method == 'GET':
-        oname = request.session.get('oname')
-        if oname is None:
-            return render(
-                request, 'OfficerLogin.html', {
-                    'data': 'Please login first'})
-
-        tid = request.GET.get('tid', False)
-        status = "Closed"
-
-        # Send Notification Email using helper
         try:
-            _send_complaint_update_email(
-                tid,
-                f"SmartCity: Complaint #{tid} Resolved",
-                "The issue has been successfully resolved/closed.")
-        except Exception:
-            pass
+            oname = request.session.get('oname')
+            if oname is None:
+                return render(
+                    request, 'OfficerLogin.html', {
+                        'data': 'Please login first'})
 
-        db_connection = pymysql.connect(**DB_CONFIG)
-        db_cursor = db_connection.cursor()
-        student_sql_query = "update complaint set status='" + \
-            status + "' where complaint_id='" + tid + "'"
-        db_cursor.execute(student_sql_query)
-        db_connection.commit()
-        output = f'<div class="status-banner success slide-in">Complaint status successfully updated: <strong>{status}</strong></div>'
-        context = {'data': output}
-        return render(request, 'OfficerScreen.html', context)
+            tid = request.GET.get('tid', '')
+            if not tid:
+                return render(request, 'OfficerScreen.html', {
+                    'data': '<div class="status-banner error">Missing complaint ID.</div>'
+                })
+                
+            status = "Closed"
+
+            # Send Notification Email using helper
+            try:
+                _send_complaint_update_email(
+                    tid,
+                    f"SmartCity: Complaint #{tid} Resolved",
+                    "The issue has been successfully resolved/closed.")
+            except Exception:
+                pass
+
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    sql = "UPDATE complaint SET status=%s WHERE complaint_id=%s"
+                    cur.execute(sql, (status, tid))
+                    db_connection.commit()
+                
+                output = f'<div class="status-banner success slide-in">Complaint status successfully updated to: <strong>{status}</strong></div>'
+                return render(request, 'OfficerScreen.html', {'data': output})
+            finally:
+                db_connection.close()
+
+        except Exception as e:
+            print(f"ERROR in UpdateStatus: {e}")
+            traceback.print_exc()
+            return render(request, 'OfficerScreen.html', {
+                'data': f'<div class="status-banner error">Server Error during update: {str(e)}</div>'
+            })
 
 
 def ViewTask(request):
@@ -280,61 +296,73 @@ def ViewTask(request):
 
 def AssignedToAction(request):
     if request.method == 'POST':
-        mname = request.session.get('mname')
-        if mname is None:
-            return render(
-                request, 'MunicipalityLogin.html', {
-                    'data': 'Please login first'})
-        complaint = request.POST.get('t1', False)
-        emp = request.POST.get('t2', False)
-        db_connection = pymysql.connect(**DB_CONFIG)
-        db_cursor = db_connection.cursor()
-        student_sql_query = "update complaint set assigned_to='" + \
-            emp + "' where complaint_id='" + complaint + "'"
-        db_cursor.execute(student_sql_query)
-        db_connection.commit()
-        print(db_cursor.rowcount, "Record Inserted")
-        status = '<div class="status-banner error slide-in">Failed to assign grievance. Please try again.</div>'
-        if db_cursor.rowcount == 1:
-            status = f'<div class="status-banner success slide-in">Work successfully assigned to: <strong>{emp}</strong></div>'
-            # Send Notification Email using helper
+        try:
+            mname = request.session.get('mname')
+            if mname is None:
+                return render(
+                    request, 'MunicipalityLogin.html', {
+                        'data': 'Please login first'})
+            
+            complaint = request.POST.get('t1', '')
+            emp = request.POST.get('t2', '')
+            
+            if not complaint or not emp:
+                return render(request, 'AssignedTo.html', {
+                    'data': '<div class="status-banner error">Please select both a complaint and an officer.</div>',
+                    'data1': '' # Optionally re-fetch here if needed
+                })
+
+            db_connection = pymysql.connect(**DB_CONFIG)
             try:
-                _send_complaint_update_email(
-                    complaint,
-                    f"SmartCity: Officer Assigned to Complaint #{complaint}",
-                    f"A field officer ({emp}) has been assigned to address your grievance.")
-            except Exception:
-                pass
+                with db_connection:
+                    cur = db_connection.cursor()
+                    # Use parameterized query for safety and to avoid TypeErrors
+                    sql = "UPDATE complaint SET assigned_to=%s WHERE complaint_id=%s"
+                    cur.execute(sql, (emp, complaint))
+                    db_connection.commit()
+                    
+                    row_count = cur.rowcount
+                    print(f"{row_count} Record Updated")
+                    
+                    if row_count == 1:
+                        status = f'<div class="status-banner success slide-in">Work successfully assigned to: <strong>{emp}</strong></div>'
+                        # Send Notification Email
+                        try:
+                            _send_complaint_update_email(
+                                complaint,
+                                f"SmartCity: Officer Assigned to Complaint #{complaint}",
+                                f"A field officer ({emp}) has been assigned to address your grievance.")
+                        except Exception:
+                            pass
+                    else:
+                        status = '<div class="status-banner error slide-in">Failed to assign grievance. Complaint might have been already assigned.</div>'
 
-        # Re-fetch the dropdowns so the assigned complaint disappears
-        output = '<tr><td><label for="complaint_id">Complaint ID</label></td><td><select name="t1" id="complaint_id">'
-        with db_connection:
-            cur = db_connection.cursor()
-            cur.execute(
-                "select complaint_id from complaint where municipality_name='" +
-                mname +
-                "' and assigned_to='-'")
-            rows = cur.fetchall()
-            for row in rows:
-                output += '<option value="' + \
-                    str(row[0]) + '">' + str(row[0]) + '</option>'
-        output += "</select></td></tr>"
+                    # Re-fetch the dropdowns
+                    output = '<tr><td><label for="complaint_id">Complaint ID</label></td><td><select name="t1" id="complaint_id">'
+                    cur.execute("SELECT complaint_id FROM complaint WHERE municipality_name=%s AND assigned_to='-'", (mname,))
+                    rows = cur.fetchall()
+                    for row in rows:
+                        output += f'<option value="{row[0]}">{row[0]}</option>'
+                    output += "</select></td></tr>"
 
-        output += '<tr><td><label for="officer_id">Field Officer</label></td><td><select name="t2" id="officer_id">'
-        with db_connection:
-            cur = db_connection.cursor()
-            cur.execute(
-                "select username from fieldofficer where municipality_name='" +
-                mname +
-                "'")
-            rows = cur.fetchall()
-            for row in rows:
-                output += '<option value="' + \
-                    row[0] + '">' + row[0] + '</option>'
-        output += "</select></td></tr>"
+                    output += '<tr><td><label for="officer_id">Field Officer</label></td><td><select name="t2" id="officer_id">'
+                    cur.execute("SELECT username FROM fieldofficer WHERE municipality_name=%s", (mname,))
+                    rows = cur.fetchall()
+                    for row in rows:
+                        output += f'<option value="{row[0]}">{row[0]}</option>'
+                    output += "</select></td></tr>"
 
-        context = {'data': status, 'data1': output}
-        return render(request, 'AssignedTo.html', context)
+                    context = {'data': status, 'data1': output}
+                    return render(request, 'AssignedTo.html', context)
+            finally:
+                db_connection.close()
+
+        except Exception as e:
+            print(f"ERROR in AssignedToAction: {e}")
+            traceback.print_exc()
+            return render(request, 'AssignedTo.html', {
+                'data': f'<div class="status-banner error">Server Error: {str(e)}</div>'
+            })
 
 
 def AssignedTo(request):
@@ -400,7 +428,10 @@ def ComplaintRequest(request):
                 output += f'<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td>'
                 output += f'<td><small>{row[4]},<br/>{row[5]}</small></td><td>{row[6]}</td><td>{row[7]}</td>'
                 output += f'<td>{row[8]}</td><td>{row[9]}</td><td>{row[10]}</td>'
-                output += f'<td><img src="/media/photo/{row[11]}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"/></td>'
+                # Image with fallback
+                output += f'<td><div style="width:80px;height:80px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden;border:1px solid #edf2f7;">'
+                output += f'<img src="/media/photo/{row[11]}" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';" style="width:100%;height:100%;object-fit:cover;"/>'
+                output += f'<div style="display:none;flex-direction:column;align-items:center;color:#a0aec0;font-size:10px;"><i class="fas fa-image" style="font-size:20px;margin-bottom:4px;"></i><span>N/A</span></div></div></td>'
                 output += f'<td><span class="badge warning">{row[13]}</span></td>'
                 if row[12] == '-':
                     output += f'<td><a href="AssignedTo?tid={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Assign Officer</a></td></tr>'
@@ -425,18 +456,25 @@ def ViewGrievanceStatus(request):
         output += '<th>Priority</th><th>Severity</th><th>Est. Cost</th>'
         output += '<th>Evidence</th><th>Assignment</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
         con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute("select * from complaint")
-            rows = cur.fetchall()
-            for row in rows:
-                if row[1] == uname:
+        try:
+            with con:
+                cur = con.cursor()
+                # Filter by citizenname in SQL for performance
+                cur.execute("SELECT * FROM complaint WHERE citizenname = %s", (uname,))
+                rows = cur.fetchall()
+                for row in rows:
                     output += f'<tr><td>{row[0]}</td><td>{row[2]}</td><td>{row[3]}</td>'
                     output += f'<td><small>{row[4]},<br/>{row[5]}</small></td><td>{row[6]}</td><td>{row[7]}</td>'
                     output += f'<td>{row[8]}</td><td>{row[9]}</td><td>{row[10]}</td>'
-                    output += f'<td><img src="/media/photo/{row[11]}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"/></td>'
+                    # Image with fallback
+                    output += f'<td><div style="width:80px;height:80px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden;border:1px solid #edf2f7;">'
+                    output += f'<img src="/media/photo/{row[11]}" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';" style="width:100%;height:100%;object-fit:cover;"/>'
+                    output += f'<div style="display:none;flex-direction:column;align-items:center;color:#a0aec0;font-size:10px;"><i class="fas fa-image" style="font-size:20px;margin-bottom:4px;"></i><span>N/A</span></div></div></td>'
                     output += f'<td>{row[12]}</td><td><span class="badge info">{row[13]}</span></td>'
                     output += f'<td><a href="javascript:void(0);" onclick="confirmDelete({row[0]})" style="display:inline-block; background:linear-gradient(135deg, #ef476f 0%, #d63654 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-trash"></i></a></td></tr>'
+        except Exception as e:
+            print(f"Error in ViewGrievanceStatus: {e}")
+            output += f'<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--gray-500);">Error loading grievance records.</td></tr>'
         output += "</tbody></table></div>"
 
         # Add JavaScript for delete confirmation
@@ -801,33 +839,44 @@ def Graph(request):
 
 def AddOfficerAction(request):
     if request.method == 'POST':
-        mname = request.session.get('mname')
-        if mname is None:
-            return render(
-                request, 'MunicipalityLogin.html', {
-                    'data': 'Please login first'})
-        username = request.POST.get('t1', False)
-        password = request.POST.get('t2', False)
-        contact = request.POST.get('t3', False)
-        status = 'none'
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "insert into fieldofficer values('" +
-                username +
-                "','" +
-                password +
-                "','" +
-                contact +
-                "','" +
-                mname +
-                "')")
-            con.commit()
-            if cur.rowcount == 1:
-                status = f'<div class="status-banner success slide-in">Field Officer <strong>{username}</strong> registered successfully.</div>'
-        context = {'data': status}
-        return render(request, 'MunicipalityScreen.html', context)
+        try:
+            mname = request.session.get('mname')
+            if mname is None:
+                return render(
+                    request, 'MunicipalityLogin.html', {
+                        'data': 'Please login first'})
+            
+            username = request.POST.get('t1', '')
+            password = request.POST.get('t2', '')
+            contact = request.POST.get('t3', '')
+            
+            if not username or not password:
+                return render(request, 'MunicipalityScreen.html', {
+                    'data': '<div class="status-banner error">Username and password are required.</div>'
+                })
+
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    # Parameterized INSERT
+                    sql = "INSERT INTO fieldofficer (username, password, contact_no, municipality_name) VALUES (%s, %s, %s, %s)"
+                    cur.execute(sql, (username, password, contact, mname))
+                    db_connection.commit()
+                    
+                    if cur.rowcount == 1:
+                        status = f'<div class="status-banner success slide-in">Field Officer <strong>{username}</strong> registered successfully.</div>'
+                    else:
+                        status = '<div class="status-banner error">Failed to register officer.</div>'
+                    
+                    return render(request, 'MunicipalityScreen.html', {'data': status})
+            finally:
+                db_connection.close()
+        except Exception as e:
+            print(f"ERROR in AddOfficerAction: {e}")
+            return render(request, 'MunicipalityScreen.html', {
+                'data': f'<div class="status-banner error">Server Error: {str(e)}</div>'
+            })
 
 
 def AddOfficer(request):
@@ -873,25 +922,30 @@ def ViewOfficer(request):
 
 def DeleteOfficer(request):
     if request.method == 'GET':
-        mname = request.session.get('mname')
-        if mname is None:
-            return render(
-                request, 'MunicipalityLogin.html', {
-                    'data': 'Please login first'})
-        username = request.GET.get('user', False)
-        if not username:
-            return render(
-                request, 'MunicipalityScreen.html', {
-                    'data': '<div class="status-banner error">Invalid Request</div>'})
+        try:
+            mname = request.session.get('mname')
+            if mname is None:
+                return render(
+                    request, 'MunicipalityLogin.html', {
+                        'data': 'Please login first'})
+            
+            username = request.GET.get('user', '')
+            if not username:
+                return redirect('ViewOfficer')
 
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "delete from fieldofficer where username='" + username + "'")
-            con.commit()
-
-        return redirect('ViewOfficer')
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    # Parameterized DELETE
+                    cur.execute("DELETE FROM fieldofficer WHERE username=%s", (username,))
+                    db_connection.commit()
+            finally:
+                db_connection.close()
+            return redirect('ViewOfficer')
+        except Exception as e:
+            print(f"ERROR in DeleteOfficer: {e}")
+            return redirect('ViewOfficer')
 
 
 def UpdateOfficer(request):
@@ -909,24 +963,31 @@ def UpdateOfficer(request):
 
 def UpdateOfficerAction(request):
     if request.method == 'POST':
-        mname = request.session.get('mname')
-        if mname is None:
-            return render(
-                request, 'MunicipalityLogin.html', {
-                    'data': 'Please login first'})
+        try:
+            mname = request.session.get('mname')
+            if mname is None:
+                return render(
+                    request, 'MunicipalityLogin.html', {
+                        'data': 'Please login first'})
 
-        username = request.POST.get('t1', False)
-        password = request.POST.get('t2', False)
-        contact = request.POST.get('t3', False)
+            username = request.POST.get('t1', '')
+            password = request.POST.get('t2', '')
+            contact = request.POST.get('t3', '')
 
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                f"update fieldofficer set password='{password}', contact_no='{contact}' where username='{username}'")
-            con.commit()
-
-        return redirect('ViewOfficer')
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    # Parameterized UPDATE
+                    sql = "UPDATE fieldofficer SET password=%s, contact_no=%s WHERE username=%s"
+                    cur.execute(sql, (password, contact, username))
+                    db_connection.commit()
+            finally:
+                db_connection.close()
+            return redirect('ViewOfficer')
+        except Exception as e:
+            print(f"ERROR in UpdateOfficerAction: {e}")
+            return redirect('ViewOfficer')
 
 
 def ViewCitizens(request):
@@ -965,24 +1026,29 @@ def ViewCitizens(request):
 
 def DeleteCitizen(request):
     if request.method == 'GET':
-        uname = request.session.get('uname')
-        if uname != 'admin':
-            return render(
-                request, 'AdminLogin.html', {
-                    'data': 'Please login first'})
-        username = request.GET.get('user', False)
-        if not username:
-            return render(
-                request, 'AdminScreen.html', {
-                    'data': '<div class="status-banner error">Invalid Request</div>'})
+        try:
+            uname = request.session.get('uname')
+            if uname != 'admin':
+                return render(
+                    request, 'AdminLogin.html', {
+                        'data': 'Please login first'})
+            
+            username = request.GET.get('user', '')
+            if not username:
+                return redirect('ViewCitizens')
 
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute("delete from signup where username='" + username + "'")
-            con.commit()
-
-        return redirect('ViewCitizens')
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    cur.execute("DELETE FROM signup WHERE username=%s", (username,))
+                    db_connection.commit()
+            finally:
+                db_connection.close()
+            return redirect('ViewCitizens')
+        except Exception as e:
+            print(f"ERROR in DeleteCitizen: {e}")
+            return redirect('ViewCitizens')
 
 
 def UpdateCitizen(request):
@@ -1007,24 +1073,32 @@ def UpdateCitizen(request):
 
 def UpdateCitizenAction(request):
     if request.method == 'POST':
-        uname = request.session.get('uname')
-        if uname != 'admin':
-            return render(
-                request, 'AdminLogin.html', {
-                    'data': 'Please login first'})
+        try:
+            uname = request.session.get('uname')
+            if uname != 'admin':
+                return render(
+                    request, 'AdminLogin.html', {
+                        'data': 'Please login first'})
 
-        username = request.POST.get('t1', False)
-        password = request.POST.get('t2', False)
-        contact = request.POST.get('t3', False)
-        email = request.POST.get('t4', False)
-        address = request.POST.get('t5', False)
+            username = request.POST.get('t1', '')
+            password = request.POST.get('t2', '')
+            contact = request.POST.get('t3', '')
+            email = request.POST.get('t4', '')
+            address = request.POST.get('t5', '')
 
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            sql = f"update signup set password='{password}', contact_no='{contact}', email_id='{email}', address='{address}' where username='{username}'"
-            cur.execute(sql)
-            con.commit()
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    sql = "UPDATE signup SET password=%s, contact_no=%s, email_id=%s, address=%s WHERE username=%s"
+                    cur.execute(sql, (password, contact, email, address, username))
+                    db_connection.commit()
+            finally:
+                db_connection.close()
+            return redirect('ViewCitizens')
+        except Exception as e:
+            print(f"ERROR in UpdateCitizenAction: {e}")
+            return redirect('ViewCitizens')
 
         # Return to citizen list with success message
         status = '<div class="status-banner success slide-in">Citizen details updated successfully.</div>'
@@ -1075,7 +1149,10 @@ def ViewUserComplaint(request):
                 output += f'<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td>'
                 output += f'<td><small>{row[4]},<br/>{row[5]}</small></td><td>{row[6]}</td><td>{row[7]}</td>'
                 output += f'<td>{row[8]}</td><td>{row[9]}</td><td>{row[10]}</td>'
-                output += f'<td><img src="/media/photo/{row[11]}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"/></td>'
+                                # Image with fallback
+                output += f'<td><div style="width:80px;height:80px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden;border:1px solid #edf2f7;">'
+                output += f'<img src="/media/photo/{row[11]}" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';" style="width:100%;height:100%;object-fit:cover;"/>'
+                output += f'<div style="display:none;flex-direction:column;align-items:center;color:#a0aec0;font-size:10px;"><i class="fas fa-image" style="font-size:20px;margin-bottom:4px;"></i><span>N/A</span></div></div></td>'
                 output += f'<td>{row[12]}</td><td><span class="badge info">{row[13]}</span></td>'
                 output += f'<td><a href="UpdateComplaint?cid={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; margin-right:10px; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-edit"></i></a>'
                 output += f'<a href="javascript:void(0);" onclick="confirmDelete({row[0]})" style="display:inline-block; background:linear-gradient(135deg, #ef476f 0%, #d63654 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-trash"></i></a></td></tr>'
@@ -1135,61 +1212,74 @@ def ViewMunicipality(request):
 
 def DeleteMunicipality(request):
     if request.method == 'GET':
-        uname = request.session.get('uname')
-        if uname != 'admin':
-            return render(
-                request, 'AdminLogin.html', {
-                    'data': 'Please login first'})
+        try:
+            uname = request.session.get('uname')
+            if uname != 'admin':
+                return render(
+                    request, 'AdminLogin.html', {
+                        'data': 'Please login first'})
 
-        mname = request.GET.get('mname', False)
-        if not mname:
-            return render(
-                request, 'AdminScreen.html', {
-                    'data': '<div class="status-banner error">Invalid Request</div>'})
+            mname = request.GET.get('mname', '')
+            if not mname:
+                return redirect('ViewMunicipality')
 
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "delete from municipality where municipality_name='" +
-                mname +
-                "'")
-            con.commit()
-
-        return redirect('ViewMunicipality')
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    cur.execute("DELETE FROM municipality WHERE municipality_name=%s", (mname,))
+                    db_connection.commit()
+            finally:
+                db_connection.close()
+            return redirect('ViewMunicipality')
+        except Exception as e:
+            print(f"ERROR in DeleteMunicipality: {e}")
+            return redirect('ViewMunicipality')
 
 
 def AddMunicipalityAction(request):
     if request.method == 'POST':
-        uname = request.session.get('uname')
-        if uname != 'admin':
-            return render(
-                request, 'AdminLogin.html', {
-                    'data': 'Please login first'})
+        try:
+            uname = request.session.get('uname')
+            if uname != 'admin':
+                return render(
+                    request, 'AdminLogin.html', {
+                        'data': 'Please login first'})
 
-        municipality = request.POST.get('t1', False)
-        city = request.POST.get('t2', False)
-        ename = request.POST.get('emp', False)
-        dept_contact = request.POST.get('t3', False)
-        emp_contact = request.POST.get('t4', False)
-        user = request.POST.get('t5', False)
-        password = request.POST.get('t6', False)
-        desc = request.POST.get('t7', False)
-        status = 'none'
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                f"select username from municipality where username = '{user}'")
-            if cur.fetchone():
-                status = 'Given Username already exists'
-            else:
-                cur.execute(
-                    f"insert into municipality values('{municipality}','{city}','{ename}','{dept_contact}','{emp_contact}','{user}','{password}','{desc}')")
-                con.commit()
-                status = '<div class="status-banner success slide-in">Municipality department successfully established.</div>'
-        context = {'data': status}
-        return render(request, 'AddMunicipality.html', context)
+            municipality = request.POST.get('t1', '')
+            city = request.POST.get('t2', '')
+            ename = request.POST.get('emp', '')
+            dept_contact = request.POST.get('t3', '')
+            emp_contact = request.POST.get('t4', '')
+            user = request.POST.get('t5', '')
+            password = request.POST.get('t6', '')
+            desc = request.POST.get('t7', '')
+            
+            if not municipality or not user:
+                return render(request, 'AddMunicipality.html', {
+                    'data': '<div class="status-banner error">Municipality name and Username are required.</div>'
+                })
+
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    cur.execute("SELECT username FROM municipality WHERE username = %s", (user,))
+                    if cur.fetchone():
+                        status = 'Given Username already exists'
+                    else:
+                        sql = "INSERT INTO municipality (municipality_name, city_name, employee_name, municipality_contact_no, employee_contact_no, username, password, municipality_desc) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                        cur.execute(sql, (municipality, city, ename, dept_contact, emp_contact, user, password, desc))
+                        db_connection.commit()
+                        status = '<div class="status-banner success slide-in">Municipality department successfully established.</div>'
+                return render(request, 'AddMunicipality.html', {'data': status})
+            finally:
+                db_connection.close()
+        except Exception as e:
+            print(f"ERROR in AddMunicipalityAction: {e}")
+            return render(request, 'AddMunicipality.html', {
+                'data': f'<div class="status-banner error">Server Error: {str(e)}</div>'
+            })
 
 
 def UpdateMunicipality(request):
@@ -1214,28 +1304,34 @@ def UpdateMunicipality(request):
 
 def UpdateMunicipalityAction(request):
     if request.method == 'POST':
-        uname = request.session.get('uname')
-        if uname != 'admin':
-            return render(
-                request, 'AdminLogin.html', {
-                    'data': 'Please login first'})
+        try:
+            uname = request.session.get('uname')
+            if uname != 'admin':
+                return render(
+                    request, 'AdminLogin.html', {
+                        'data': 'Please login first'})
 
-        mname = request.POST.get('t1', False)  # Readonly
-        city = request.POST.get('t2', False)
-        ename = request.POST.get('emp', False)
-        dept_contact = request.POST.get('t3', False)
-        emp_contact = request.POST.get('t4', False)
-        password = request.POST.get('t6', False)
-        desc = request.POST.get('t7', False)
+            mname = request.POST.get('t1', '')
+            city = request.POST.get('t2', '')
+            ename = request.POST.get('emp', '')
+            dept_contact = request.POST.get('t3', '')
+            emp_contact = request.POST.get('t4', '')
+            password = request.POST.get('t6', '')
+            desc = request.POST.get('t7', '')
 
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            sql = "update municipality set city_name='" + city + "', employee_name='" + ename + "', municipality_contact_no='" + dept_contact + \
-                "', employee_contact_no='" + emp_contact + "', password='" + password + \
-                "', municipality_desc='" + desc + "' where municipality_name='" + mname + "'"
-            cur.execute(sql)
-            con.commit()
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    sql = "UPDATE municipality SET city_name=%s, employee_name=%s, municipality_contact_no=%s, employee_contact_no=%s, password=%s, municipality_desc=%s WHERE municipality_name=%s"
+                    cur.execute(sql, (city, ename, dept_contact, emp_contact, password, desc, mname))
+                    db_connection.commit()
+            finally:
+                db_connection.close()
+            return redirect('ViewMunicipality')
+        except Exception as e:
+            print(f"ERROR in UpdateMunicipalityAction: {e}")
+            return redirect('ViewMunicipality')
 
         # Generate view with success message
         status = '<div class="status-banner success slide-in">Municipality details updated successfully.</div>'
@@ -1276,51 +1372,52 @@ def AddMunicipality(request):
 
 def OfficerLoginAction(request):
     if request.method == 'POST':
-        option = 0
-        username = request.POST.get('t1', False)
-        password = request.POST.get('t2', False)
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "select username, password, municipality_name FROM fieldofficer")
-            rows = cur.fetchall()
-            for row in rows:
-                if row[0] == username and row[1] == password:
-                    request.session['oname'] = username
-                    option = 1
-                    break
-        if option == 1:
-            context = {'data': 'welcome ' + username}
-            return render(request, 'OfficerScreen.html', context)
-        else:
-            context = {'data': 'Invalid login details'}
-            return render(request, 'OfficerLogin.html', context)
+        try:
+            username = request.POST.get('t1', '')
+            password = request.POST.get('t2', '')
+            
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    # Secure parameterized query
+                    cur.execute("SELECT username, municipality_name FROM fieldofficer WHERE username=%s AND password=%s", (username, password))
+                    row = cur.fetchone()
+                    if row:
+                        request.session['oname'] = row[0]
+                        return render(request, 'OfficerScreen.html', {'data': f'welcome {username}'})
+                    else:
+                        return render(request, 'OfficerLogin.html', {'data': 'Invalid login details'})
+            finally:
+                db_connection.close()
+        except Exception as e:
+            print(f"ERROR in OfficerLoginAction: {e}")
+            return render(request, 'OfficerLogin.html', {'data': f'Server Error: {str(e)}'})
 
 
 def MunicipalityLoginAction(request):
     if request.method == 'POST':
-        option = 0
-        username = request.POST.get('t1', False)
-        password = request.POST.get('t2', False)
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "select username, password, municipality_name, city_name FROM municipality")
-            rows = cur.fetchall()
-            for row in rows:
-                if row[0] == username and row[1] == password:
-                    # Store Department Name for filtering
-                    request.session['mname'] = row[2]
-                    option = 1
-                    break
-        if option == 1:
-            context = {'data': 'welcome ' + username}
-            return render(request, 'MunicipalityScreen.html', context)
-        else:
-            context = {'data': 'Invalid login details'}
-            return render(request, 'MunicipalityLogin.html', context)
+        try:
+            username = request.POST.get('t1', '')
+            password = request.POST.get('t2', '')
+            
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    # Secure parameterized query
+                    cur.execute("SELECT username, municipality_name FROM municipality WHERE username=%s AND password=%s", (username, password))
+                    row = cur.fetchone()
+                    if row:
+                        request.session['mname'] = row[1]
+                        return render(request, 'MunicipalityScreen.html', {'data': f'welcome {username}'})
+                    else:
+                        return render(request, 'MunicipalityLogin.html', {'data': 'Invalid login details'})
+            finally:
+                db_connection.close()
+        except Exception as e:
+            print(f"ERROR in MunicipalityLoginAction: {e}")
+            return render(request, 'MunicipalityLogin.html', {'data': f'Server Error: {str(e)}'})
 
 
 def OfficerLogin(request):
@@ -1372,62 +1469,63 @@ def Register(request):
 
 def RegisterAction(request):
     if request.method == 'POST':
-        username = request.POST.get('t1', False)
-        password = request.POST.get('t2', False)
-        contact = request.POST.get('t3', False)
-        email = request.POST.get('t4', False)
-        address = request.POST.get('t5', False)
-        if not email.endswith("@gmail.com"):
-            status = 'Email must end with @gmail.com'
-        else:
-            status = 'none'
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute(
-                "select username from signup where username = '" +
-                username +
-                "'")
-            rows = cur.fetchall()
-            for row in rows:
-                if row[0] == email:
-                    status = 'Given Username already exists'
-                    break
-        if status == 'none':
+        try:
+            username = request.POST.get('t1', '')
+            password = request.POST.get('t2', '')
+            contact = request.POST.get('t3', '')
+            email = request.POST.get('t4', '')
+            address = request.POST.get('t5', '')
+            
+            if not email.endswith("@gmail.com"):
+                return render(request, 'Register.html', {'data': 'Email must end with @gmail.com'})
+
             db_connection = pymysql.connect(**DB_CONFIG)
-            db_cursor = db_connection.cursor()
-            student_sql_query = "INSERT INTO signup(username,password,contact_no,email_id,address) VALUES('" + \
-                username + "','" + password + "','" + contact + "','" + email + "','" + address + "')"
-            db_cursor.execute(student_sql_query)
-            db_connection.commit()
-            print(db_cursor.rowcount, "Record Inserted")
-            if db_cursor.rowcount == 1:
-                status = '<div class="status-banner success slide-in">Account created successfully! You can now login for city services.</div>'
-        context = {'data': status}
-        return render(request, 'Register.html', context)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    # Check if username/email already exists
+                    cur.execute("SELECT username FROM signup WHERE username = %s OR email_id = %s", (username, email))
+                    if cur.fetchone():
+                        status = 'Given Username or Email already exists'
+                    else:
+                        sql = "INSERT INTO signup(username, password, contact_no, email_id, address) VALUES(%s, %s, %s, %s, %s)"
+                        cur.execute(sql, (username, password, contact, email, address))
+                        db_connection.commit()
+                        if cur.rowcount == 1:
+                            status = '<div class="status-banner success slide-in">Account created successfully! You can now login for city services.</div>'
+                        else:
+                            status = '<div class="status-banner error">Failed to create account.</div>'
+                return render(request, 'Register.html', {'data': status})
+            finally:
+                db_connection.close()
+        except Exception as e:
+            print(f"ERROR in RegisterAction: {e}")
+            return render(request, 'Register.html', {'data': f'<div class="status-banner error">Server Error: {str(e)}</div>'})
 
 
 def UserLoginAction(request):
     if request.method == 'POST':
-        option = 0
-        username = request.POST.get('t1', False)
-        password = request.POST.get('t2', False)
-        con = pymysql.connect(**DB_CONFIG)
-        with con:
-            cur = con.cursor()
-            cur.execute("select * FROM signup")
-            rows = cur.fetchall()
-            for row in rows:
-                if row[0] == username and row[1] == password:
-                    request.session['uname'] = username
-                    option = 1
-                    break
-        if option == 1:
-            context = {'data': 'welcome ' + username}
-            return render(request, 'UserScreen.html', context)
-        else:
-            context = {'data': 'Invalid login details'}
-            return render(request, 'UserLogin.html', context)
+        try:
+            username = request.POST.get('t1', '')
+            password = request.POST.get('t2', '')
+            
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    # Secure parameterized query
+                    cur.execute("SELECT username FROM signup WHERE username=%s AND password=%s", (username, password))
+                    row = cur.fetchone()
+                    if row:
+                        request.session['uname'] = username
+                        return render(request, 'UserScreen.html', {'data': f'welcome {username}'})
+                    else:
+                        return render(request, 'UserLogin.html', {'data': 'Invalid login details'})
+            finally:
+                db_connection.close()
+        except Exception as e:
+            print(f"ERROR in UserLoginAction: {e}")
+            return render(request, 'UserLogin.html', {'data': f'Server Error: {str(e)}'})
 
 
 def UpdateComplaint(request):
@@ -1440,18 +1538,21 @@ def UpdateComplaint(request):
         with con:
             cur = con.cursor()
             cur.execute(
-                f"select description, category, priority, status from complaint where complaint_id='{cid}'")
+                f"select description, category, priority, status, photo from complaint where complaint_id='{cid}'")
             row = cur.fetchone()
             if row:
                 description = row[0]
                 category = row[1]
                 priority = row[2]
                 status = row[3]
+                photo = row[4]
             else:
                 status = "Unknown"
+                photo = ""
         context = {
             'cid': cid,
             'description': description,
+            'photo': photo,
             'cat_road': category == "Road Damage",
             'cat_sanitation': category == "Sanitation",
             'cat_water': category == "Drinking Water",
@@ -1469,23 +1570,36 @@ def UpdateComplaint(request):
 
 def UpdateComplaintAction(request):
     if request.method == 'POST':
-        cid = request.POST.get('cid', False)
-        description = request.POST.get('t1', False)
-        category = request.POST.get('t2', False)
-        priority = request.POST.get('t3', False)
-        status = request.POST.get('t4', False)
+        try:
+            cid = request.POST.get('cid', '')
+            description = request.POST.get('t1', '')
+            category = request.POST.get('t2', '')
+            priority = request.POST.get('t3', '')
+            status = request.POST.get('t4', '')
 
-        db_connection = pymysql.connect(**DB_CONFIG)
-        db_cursor = db_connection.cursor()
-        sql = f"update complaint set description='{description}', category='{category}', priority='{priority}', status='{status}' where complaint_id='{cid}'"
-        db_cursor.execute(sql)
-        db_connection.commit()
+            db_connection = pymysql.connect(**DB_CONFIG)
+            try:
+                with db_connection:
+                    cur = db_connection.cursor()
+                    sql = "UPDATE complaint SET description=%s, category=%s, priority=%s, status=%s WHERE complaint_id=%s"
+                    cur.execute(sql, (description, category, priority, status, cid))
+                    db_connection.commit()
+            finally:
+                db_connection.close()
 
-        # Send Notification Email using helper
-        _send_complaint_update_email(
-            cid,
-            f"SmartCity: Complaint #{cid} Updated by Administrator",
-            "An administrator has updated the details (description, category, or priority) of your grievance.")
+            # Send Notification Email using helper
+            try:
+                _send_complaint_update_email(
+                    cid,
+                    f"SmartCity: Complaint #{cid} Updated by Administrator",
+                    "An administrator has updated the details of your grievance.")
+            except Exception:
+                pass
+            
+            return redirect('ViewUserComplaint')
+        except Exception as e:
+            print(f"ERROR in UpdateComplaintAction: {e}")
+            return redirect('ViewUserComplaint')
 
         # Regenerate ViewUserComplaint with success message
         status_msg = f'<div class="status-banner success slide-in">Complaint #<strong>{cid}</strong> updated successfully.</div>'
@@ -1505,7 +1619,10 @@ def UpdateComplaintAction(request):
                 output += f'<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td>'
                 output += f'<td><small>{row[4]},<br/>{row[5]}</small></td><td>{row[6]}</td><td>{row[7]}</td>'
                 output += f'<td>{row[8]}</td><td>{row[9]}</td><td>{row[10]}</td>'
-                output += f'<td><img src="/media/photo/{row[11]}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"/></td>'
+                                # Image with fallback
+                output += f'<td><div style="width:80px;height:80px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden;border:1px solid #edf2f7;">'
+                output += f'<img src="/media/photo/{row[11]}" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';" style="width:100%;height:100%;object-fit:cover;"/>'
+                output += f'<div style="display:none;flex-direction:column;align-items:center;color:#a0aec0;font-size:10px;"><i class="fas fa-image" style="font-size:20px;margin-bottom:4px;"></i><span>N/A</span></div></div></td>'
                 output += f'<td>{row[12]}</td><td><span class="badge info">{row[13]}</span></td>'
                 output += f'<td><a href="UpdateComplaint?cid={row[0]}" style="display:inline-block; background:linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; margin-right:10px; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-edit"></i></a>'
                 output += f'<a href="javascript:void(0);" onclick="confirmDelete({row[0]})" style="display:inline-block; background:linear-gradient(135deg, #ef476f 0%, #d63654 100%); color:white; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-trash"></i></a></td></tr>'
