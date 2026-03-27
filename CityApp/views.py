@@ -637,14 +637,17 @@ def ReportComplaintAction(request):
                 # status = status.replace('Registered', f'Registered (AI Error: {error_msg[:30]}...)')
 
             # 3. Notification & Response
-            is_road_damage = str(category).strip().lower() == "road damage"
+            category_clean = str(category).strip()
+            is_road_damage = category_clean.lower() == "road damage"
             
             # Base status
             status_header = "Complaint Registered"
+            debug_info = f"<!-- AI:{success} Cat:{category_clean} IP:{img!=''[:5]} -->"
+            
             if not success:
                 status_header += " (Pending AI Analysis)"
                 
-            status = f'<div class="status-banner success slide-in"><h4>{status_header}</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p>'
+            status = f'<div class="status-banner success slide-in"><h4>{status_header}</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p>{debug_info}'
             
             if success and is_road_damage:
                 status += f'<span class="badge info">Automatic Estimated Cost: ₹{cost}</span>'
