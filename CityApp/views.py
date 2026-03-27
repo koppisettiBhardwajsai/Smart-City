@@ -637,18 +637,19 @@ def ReportComplaintAction(request):
                 # status = status.replace('Registered', f'Registered (AI Error: {error_msg[:30]}...)')
 
             # 3. Notification & Response
-            status = f'<div class="status-banner success slide-in"><h4>Complaint Registered</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p></div>'
-
-            # Case-insensitive robust category check
             is_road_damage = str(category).strip().lower() == "road damage"
-
+            
+            # Base status
+            status_header = "Complaint Registered"
+            if not success:
+                status_header += " (Pending AI Analysis)"
+                
+            status = f'<div class="status-banner success slide-in"><h4>{status_header}</h4><p>ID: <strong>#{ticket}</strong> | Assigned: <strong>{municipality}</strong></p>'
+            
             if success and is_road_damage:
-                status = status.replace(
-                    '</div>',
-                    f'<span class="badge info">Automatic Estimated Cost: ₹{cost}</span></div>')
-            elif not success:
-                status = status.replace(
-                    'Registered', 'Registered (Pending AI Analysis)')
+                status += f'<span class="badge info">Automatic Estimated Cost: ₹{cost}</span>'
+            
+            status += '</div>'
 
             # Async email notification
             try:
