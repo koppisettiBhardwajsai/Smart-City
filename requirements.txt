@@ -8,3 +8,6 @@ gunicorn
 whitenoise
 python-dotenv
 dj-database-url
+torch
+torchvision
+cryptography

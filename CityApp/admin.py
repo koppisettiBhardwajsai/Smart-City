@@ -1,3 +1,2 @@
-from django.contrib import admin
-
-# Register your models here.
+# CityApp/admin.py
+# Removed unused imports

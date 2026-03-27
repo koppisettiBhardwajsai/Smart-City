@@ -163,3 +163,7 @@ cython_debug/
 tmp/
 *.log
 model/*.pt.tmp
+
+.flake8
+check_deps.py
+test_all_imports.py

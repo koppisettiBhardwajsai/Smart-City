@@ -24,7 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-aed)pxhinxop*@c7s#heo$_9@%e9p*9va1@q1n#_9*sds9joiu')
+SECRET_KEY = os.getenv(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-aed)pxhinxop*@c7s#heo$_9@%e9p*9va1@q1n#_9*sds9joiu')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
@@ -158,6 +160,6 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 
 # Database configuration for views.py (Move this to settings if possible, but keeping it here for now as requested)
-import dj_database_url
 # For production, we can use dj_database_url to parse external DB strings
-# This would require refactoring views.py to use Django ORM or reading from here.
+# This would require refactoring views.py to use Django ORM or reading
+# from here.
