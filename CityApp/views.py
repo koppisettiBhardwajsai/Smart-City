@@ -614,27 +614,24 @@ def ReportComplaintAction(request):
             try:
                 # Long-running AI Task
                 img, severity, cost = predictDamage(file_path)
-
-                # Update the database with AI results using a FRESH connection
-                # This prevents the initial connection from timing out during AI processing.
-                con_update = pymysql.connect(**DB_CONFIG)
-                try:
-                    with con_update:
-                        cur_update = con_update.cursor()
-                        query_update = "UPDATE complaint SET severity=%s, cost=%s WHERE complaint_id=%s"
-                        cur_update.execute(query_update, (severity, cost, ticket))
-                        con_update.commit()
-                finally:
-                    con_update.close()
-
-                success = True
+                
+                if img:
+                    success = True
+                    # Update the database with AI results
+                    try:
+                        con_update = pymysql.connect(**DB_CONFIG)
+                        with con_update:
+                            cur_update = con_update.cursor()
+                            query_update = "UPDATE complaint SET severity=%s, cost=%s WHERE complaint_id=%s"
+                            cur_update.execute(query_update, (severity, cost, ticket))
+                            con_update.commit()
+                        con_update.close()
+                    except Exception as db_e:
+                        print(f"Database update failed after AI success: {db_e}")
             except Exception as e:
                 error_msg = str(e)
                 print(f"CRITICAL AI FAILURE (OOM/Timeout/DB): {error_msg}")
                 traceback.print_exc()
-                
-                # Log detailed error for debugging if needed
-                # status = status.replace('Registered', f'Registered (AI Error: {error_msg[:30]}...)')
 
             # 3. Notification & Response
             category_clean = str(category).strip()
